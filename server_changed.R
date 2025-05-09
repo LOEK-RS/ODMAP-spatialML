@@ -6,6 +6,8 @@ library(shinydashboard)
 library(DT)
 library(tidyverse)
 library(rangeModelMetadata)
+library(leaflet)
+library(sf)
 
 odmap_dict = read.csv("www/odmap_dict.csv", header = T, stringsAsFactors = F)
 rmm_dict = rmmDataDictionary()
@@ -28,12 +30,27 @@ server <- function(input, output, session) {
   
   render_objective = function(element_id, element_placeholder){
     selectizeInput(inputId = element_id, label = NULL, multiple = F, options = list(create = T, placeholder = "Choose from list"),
-                   choices = list("", "Inference and explanation", "Mapping and interpolation"))
+                   choices = list("", "Inference and explanation", "Prediction"))
   }
   
   render_suggestion = function(element_id, element_placeholder, suggestions){
     suggestions = sort(trimws(unlist(strsplit(suggestions, ","))))
     selectizeInput(inputId = element_id, label = element_placeholder, choices = suggestions, multiple = TRUE, options = list(create = T,  placeholder = "Choose from list or insert new values"))
+  }
+  
+  #render_samples = function(element_id, element_placeholder) {
+  #  #plotOutput()
+  #  actionButton("Upload samples", label = element_placeholder, icon = icon("plus"))
+  #}
+  
+  render_samples = function(element_id){
+      train_locs <- sf::st_read("~/Beyond/Data/Basisdaten/studyarea/experiementalplots.gpkg") |> 
+        st_transform("epsg:4326")
+      renderLeaflet({ 
+        leaflet(train_locs) |> 
+          addCircleMarkers(radius=5, color=FALSE, fillOpacity = 1) |> 
+          addTiles()
+      }) 
   }
   
   render_model_algorithm = function(element_id, element_placeholder){
@@ -70,6 +87,7 @@ server <- function(input, output, session) {
                                       author = render_authors(),
                                       objective = render_objective(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       suggestion = render_suggestion(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
+                                      samples = render_samples(section_dict$element_id[i]),
                                       model_algorithm = render_model_algorithm(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       model_setting = render_model_settings())
         
@@ -135,6 +153,16 @@ server <- function(input, output, session) {
     paste(authors$df$first_name, authors$df$last_name, collapse = ", ")
   }
   
+  knit_extent = function(element_id){
+    if(any(c(input[[paste0(element_id, "_xmin")]], input[[paste0(element_id, "_xmax")]], input[[paste0(element_id, "_ymin")]], input[[paste0(element_id, "_ymax")]]) == "")){
+      knit_missing(element_id)
+    } else {
+      element_value = paste(c(input[[paste0(element_id, "_xmin")]], input[[paste0(element_id, "_xmax")]], 
+                              input[[paste0(element_id, "_ymin")]], input[[paste0(element_id, "_ymax")]]), collapse = ", ")
+      cat("\nSpatial extent: ", element_value, " (xmin, xmax, ymin, ymax)\n", sep="")
+    }
+  }
+  
   knit_suggestion = function(element_id){
     if(is.null(input[[element_id]])){
       knit_missing(element_id)
@@ -195,6 +223,17 @@ server <- function(input, output, session) {
     }
   }
   
+  import_odmap_to_extent = function(element_id, values){
+    values = gsub("(^.*)( \\(xmin, xmax, ymin, ymax\\)$)", "\\1", values)
+    values_split = unlist(strsplit(values, ", "))
+    names(values_split) = c("xmin", "xmax", "ymin", "ymax")
+    for(i in 1:length(values_split)){
+      if(input[[paste0(element_id, "_", names(values_split[i]))]] == "" | input[["replace_values"]] == "Yes"){
+        updateTextAreaInput(session = session, inputId = paste0(element_id, "_", names(values_split[i])), value = as.numeric(values_split[i]))
+      }
+    }
+  }
+  
   import_odmap_to_model_algorithm = function(element_id, values){
     if(length(input[[element_id]]) == 0 | input[["replace_values"]] == "Yes"){
       values = unlist(strsplit(values, split = "; "))
@@ -202,6 +241,13 @@ server <- function(input, output, session) {
       updateSelectizeInput(session = session, inputId = element_id, choices = suggestions_new, selected = values)  
     }
   }
+  
+  import_geo_to_sample = function(element_id, values){
+    if(input[[element_id]] == "" | input[["replace_values"]] == "Yes"){
+      updateSelectizeInput(session = session, inputId = "o_response_7", selected = values)
+    }
+  }
+  
   
   # Generic import functions
   import_model_settings = function(element_id, values){
@@ -252,6 +298,16 @@ server <- function(input, output, session) {
     return(ifelse(!is.null(val), paste(input[[element_id]], collapse = "; "), NA))
   }
   
+  export_extent = function(element_id){
+    if(any(c(input[[paste0(element_id, "_xmin")]], input[[paste0(element_id, "_xmax")]], input[[paste0(element_id, "_ymin")]], input[[paste0(element_id, "_ymax")]]) == "")){
+      return(NA)
+    } else {
+      values = paste(c(input[[paste0(element_id, "_xmin")]], input[[paste0(element_id, "_xmax")]], 
+                       input[[paste0(element_id, "_ymin")]], input[[paste0(element_id, "_ymax")]]), collapse = ", ")
+      return(paste0(values, " (xmin, xmax, ymin, ymax)"))
+    }
+  }
+  
   export_model_setting = function(element_id){
     if(is.null(input[["o_algorithms_1"]])){
       return(NA)
@@ -275,10 +331,10 @@ server <- function(input, output, session) {
   # ------------------------------------------------------------------------------------------#
   # "Create a protocol" - mainPanel elements
   output$Overview_UI = render_section("Overview", odmap_dict)
+  output$Data_UI = render_section("Data", odmap_dict)
   output$Model_UI = render_section("Model", odmap_dict)
-  output$Prediction_UI = render_section("Prediction", odmap_dict)
-  
-  for(tab in c("Overview_UI", "Model_UI", "Prediction_UI")){
+
+  for(tab in c("Overview_UI", "Data_UI", "Model_UI")){
     outputOptions(output, tab, suspendWhenHidden = FALSE) # Add tab contents to output object before rendering
   } 
   
@@ -290,6 +346,7 @@ server <- function(input, output, session) {
       all_elements = odmap_dict %>% 
         filter(section == sect & !element_id %in% unlist(elem_hidden) & !element_type %in% c("model_setting", "author")) %>% 
         filter(if(input$hide_optional) !element_id %in% elem_optional else T) %>% 
+        mutate(element_id = ifelse(element_type == "extent", paste0(element_id, "_xmin"), element_id)) %>%  
         pull(element_id)
       if(length(all_elements) == 0){
         next 
@@ -340,6 +397,7 @@ server <- function(input, output, session) {
                                            author = export_authors(odmap_download$element_id[i]),
                                            objective = export_standard(odmap_download$element_id[i]),
                                            suggestion = export_suggestion(odmap_download$element_id[i]),
+                                           extent = export_extent(odmap_download$element_id[i]),
                                            model_algorithm = export_suggestion(odmap_download$element_id[i]),
                                            model_setting = export_model_setting(odmap_download$element_id[i]),
                                            "") 
@@ -379,16 +437,16 @@ server <- function(input, output, session) {
     if(!is.null(input$upload)){
       # Obtain file extension
       file_type = gsub( "(^.*)(\\.[A-z]*$)", replacement = "\\2", input$upload$datapath)
-      if(!file_type %in% c(".csv", ".RDS")){
-        showNotification("Please select and provide a .csv (ODMAP, RMMS) or .RDS file (RMMS).", duration = 3, type = "error")
+      if(!file_type %in% c(".csv", ".gpkg")){
+        showNotification("Please select and provide a .csv (STeMP) or .gpkg file (samples).", duration = 3, type = "error")
         reset("upload")
         return()
       }
       
       # Read in file
-      if(file_type == ".RDS"){
+      if(file_type == ".gpkg"){
         tryCatch({
-          protocol_upload = rmmToCSV(protocol_upload, input$upload$datapath)
+          spatial_upload = sf::st_read(input$upload$datapath)
         }, error = function(e){
           showNotification("Could not read file.", duration = 3, type = "error")
           reset("upload")
@@ -396,26 +454,35 @@ server <- function(input, output, session) {
         })
       } else {
         protocol_upload = read.csv(file = input$upload$datapath, header = T, sep = ",", stringsAsFactors = F, na.strings = c("NA", "", "NULL"))
+        protocol_type = "ODMAP"
       }
       
-      # Identify protocol type
-      if(all(c("section", "subsection", "element", "Value") %in% colnames(protocol_upload))){
-        protocol_type = "ODMAP"
-      } else if(all(c("Field.1", "Field.2", "Field.3", "Entity", "Value") %in% colnames(protocol_upload))){
-        protocol_type = "RMMS"
+      # Detect if prediction area or training samples
+      if(sf::st_geometry_type(spatial_upload)[1] %in% c("POINT", "MULTIPOINT")){
+        spatial_type = "samples"
+      } else if(sf::st_geometry_type(spatial_upload)[1] %in% c("POLYGON", "MULTIPOLYGON")){
+        spatial_type = "prediction"
       } else {
-        showNotification("Please select a valid ODMAP or RMMS file", duration = 3, type = "error")
+        showNotification(paste("Please select a valid .gpkg", sf::st_geometry_type(spatial_upload)[1]), duration = 3, type = "error")
         reset("upload")
         return()
       }
       
-      if(sum(!is.na(protocol_upload$Value))>0){
-        UI_list[[1]] = p(paste0("File: ", input$upload$name, " (", protocol_type, " protocol, ", sum(!is.na(protocol_upload$Value)), " non-empty fields)"))
-        UI_list[[2]] = radioButtons("replace_values", "Overwrite non-empty fields with uploaded values?", choices = c("Yes", "No"), selected = "No")
-        UI_list[[3]] = actionButton(paste0(protocol_type, "_to_input"), "Copy to input form")
+      if(!is.null(spatial_upload)) {
+        UI_list[[1]] = p(paste0("File: ", input$upload$name, " (", spatial_type, " protocol, ", sum(!is.na(spatial_upload$Value)), " non-empty fields)"))
+        UI_list[[2]] = radioButtons("upload_samples", "Upload sample geometry?", choices = c("Yes", "No"), selected = "Yes")
+        UI_list[[3]] = actionButton(paste0(spatial_type, "_to_input"), "Copy to data")
       } else{
-        showNotification("Please select a ODMAP or RMMS file with at least one non-empty field", duration = 5, type = "error")
+        showNotification("Please select a gpkg file with at least one non-empty field", duration = 5, type = "error")
       }
+      
+      #if(sum(!is.na(protocol_upload$Value))>0){
+      #  UI_list[[1]] = p(paste0("File: ", input$upload$name, " (", protocol_type, " protocol, ", sum(!is.na(protocol_upload$Value)), " non-empty fields)"))
+      #  UI_list[[2]] = radioButtons("upload_samples", "Upload sample geometry?", choices = c("Yes", "No"), selected = "Yes")
+      #  UI_list[[3]] = actionButton(paste0(protocol_type, "_to_input"), "Copy to data")
+      #} else{
+      #  showNotification("Please select a ODMAP or RMMS file with at least one non-empty field", duration = 5, type = "error")
+      #}
       
     }
     return(UI_list)
@@ -426,7 +493,9 @@ server <- function(input, output, session) {
                                                    unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(inference  == 0)), subsection_id)), # unused subsections
                                                    "p"),
                    "Prediction and mapping" =  c(pull(odmap_dict %>% filter(prediction == 0), element_id), 
-                                                 unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(prediction == 0)), subsection_id))))
+                                                 unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(prediction == 0)), subsection_id))),
+                   "Projection and transfer" =  c(pull(odmap_dict %>% filter(projection == 0), element_id),
+                                                  unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(projection  == 0)), subsection_id))))
   
   elem_optional = c(pull(odmap_dict %>% filter(optional == 1), element_id), # optional elements
                     unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(optional == 1)), subsection_id))) # optional subsections)
@@ -448,6 +517,34 @@ server <- function(input, output, session) {
       hideTab("tabset", "Prediction")
     } else {
       showTab("tabset", "Prediction")
+    }
+  })
+  
+  # Extent Long/Lat
+  observe({
+    input_names = c("o_scale_1_xmin", "o_scale_1_xmax", "o_scale_1_ymax", "o_scale_1_ymin")
+    print_message = F
+    for(input_name in input_names){
+      if(grepl("xmin|xmax", input_name)){
+        value_range = c(-180, 180)
+      } else { 
+        value_range = c(-90, 90)
+      }
+      
+      if(is.null(input[[input_name]])){
+        next
+      } else if(input[[input_name]] == "") {
+        next
+      } else {
+        input_value = ifelse(is.na(as.numeric(input[[input_name]])), -999, as.numeric(input[[input_name]]))  # Check if input is valid number
+        if(input_value < value_range[1] | input_value > value_range[2]){
+          updateTextAreaInput(session = session, inputId = input_name, value = "")
+          print_message = T
+        }
+      }
+    }
+    if(print_message){
+      showNotification("Please enter valid latitude/longitude coordinates", duration = 3, type = "error")  
     }
   })
   
@@ -595,6 +692,7 @@ server <- function(input, output, session) {
              author = import_odmap_to_authors(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
              objective = import_odmap_to_model_objective(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
              suggestion = import_suggestion(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
+             extent = import_odmap_to_extent(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
              model_algorithm = import_odmap_to_model_algorithm(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
              model_setting = import_model_settings(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]))
     }
@@ -604,5 +702,28 @@ server <- function(input, output, session) {
     updateNavbarPage(session, "navbar", selected = "create")
     updateTabsetPanel(session, "Tabset", selected = "Overview")
   })
+  
+  observeEvent(input$samples_to_input, {
+    
+    samples_upload = sf::st_read(input$upload$datapath)
+    
+    # 1. Prepare imported values
+    #if(nrow(samples_upload) > 0) {
+    #  
+    #  plot(samples_upload)
+    #  
+    #}
+    
+    samples = import_geo_to_sample()
+    
+    # Switch to "Create a protocol" 
+    reset("upload")
+    updateNavbarPage(session, "navbar", selected = "create")
+    updateTabsetPanel(session, "Tabset", selected = "Data")
+
+  })
+  
+  
+  
   
 }

@@ -1,0 +1,98 @@
+﻿running_number,section,section_id,subsection,subsection_id,element,element_id,element_placeholder,element_type,suggestions,optional,inference,prediction
+1,Overview,o,Authorship,o_authorship,Model title,o_authorship_1,Model title,text,,0,1,1
+2,Overview,o,Authorship,o_authorship,Author names,o_authorship_2,Author names,author,,0,1,1
+3,Overview,o,Authorship,o_authorship,Contact ,o_authorship_3,Contact email address,text,,0,1,1
+4,Overview,o,Authorship,o_authorship,Study title,o_authorship_4,Study title,text,,1,1,1
+5,Overview,o,Authorship,o_authorship,Study link,o_authorship_5,"Link to study (DOI, web address)",text,,1,1,1
+6,Overview,o,Model objective,o_objective,Model objective,o_objective_1,Model objective,objective,,0,1,1
+7,Overview,o,Target variable,o_objective,Target variable,o_objective_2,"The target variable the model aims to predict. E.g., Nitrogen concentrations, soil pH",text,,0,1,1
+8,Overview,o,Scientific Field,o_field,Scientific Field,o_field,Scientific field in which the model was developed,suggestion,"Biogeosciences, Atmosphere, Oceanography, Cryosphere, Hydrology",0,1,1
+1,Data,d,Response,d_response,Sample acquisition,d_response_1,Sample acquisition,suggestion,"In-Situ, Image interpretation, Simulation",0,1,1
+2,Data,d,Response,d_response,Sample geometry,d_response_2,Sample geometry,suggestion,"Point, Polygon, Raster, Image Tiles",1,1,1
+3,Data,d,Response,d_response,Sample size,d_response_3,Sample size,text,,0,1,1
+4,Data,d,Response,d_response,Classes,d_response_4,Number of classes,text,,1,1,1
+5,Data,d,Response,d_response,Samples per class,d_response_5,Samples per class,text,,1,1,1
+6,Data,d,Response,d_response,Range,d_response_6,Interpolation range,text,,1,1,1
+7,Data,d,Response,d_response,Sampling locations,d_response_7,Sampling locations,text,,1,1,1
+8,Data,d,Response,d_response,Sampling design,d_response_8,Sampling design,suggestion,"random, uniform, stratified, clustered",1,1,1
+9,Data,d,Response,d_response,Coordinate Reference System,d_response_9,Coordinate Reference System (epsg),text,,1,1,1
+10,Data,d,Response,d_response,Data sources,d_response_10,Data sources,text,,1,1,1
+11,Data,d,Predictors,d_predictors,Predictor types,d_predictors_1,Type of predictor variables: choose from list or insert new values,suggestion,"Remote Sensing Images, Simulated Data, Spatial Proxies",0,1,1
+12,Data,d,Predictors,d_predictors,Number of predictors,d_predictors_2,Amount of predictor variables,text,,0,1,1
+13,Data,d,Predictors,d_predictors,Names of predictors,d_predictors_3,List of all initial predictor variables,text,,1,1,1
+14,Data,d,Predictors,d_predictors,Details on predictors,d_predictors_4,Type of predictor variables: choose from list or insert new values,text,,1,1,1
+15,Data,d,Predictors,d_predictors,Preprocessing,d_predictors_5,"Detail on preprocessing steps taken (e.g., Cloud removal, Normalization, Filtering, Outlier removal)",suggestion,,1,1,1
+16,Data,d,Predictors,d_predictors,Data sources,d_predictors_6,Data sources,text,,1,1,1
+1,Model,m,Learning method,m_algorithms,Model type,m_algorithms_1,Model type,suggestion,"Regression, Classification",0,1,1
+2,Model,m,Learning method,m_algorithms,Learning method,m_algorithms_1,Learning method used,model_algorithm,,0,1,1
+3,Model,m,Learning method,m_algorithms,Architecture,m_algorithms_2,"Outline the model's architecture (nodes, layers etc.)",text,,1,1,1
+4,Model,m,Learning method,m_algorithms,Threshold selection,m_algorithms_3,"Details on threshold selection, if applicable: transforming continuous predictions into binary predictions",text,,1,0,1
+5,Model,m,Learning method,m_algorithms,Post-processing,m_algorithms_4,"Post-processing, e.g. Filter",text,,1,0,1
+6,Model,m,Learning method,m_algorithms,Training domain,m_algorithms_5,(Spatial) Training domain / area,suggestion,"global, regional, landscape, local",1,1,1
+7,Model,m,Learning method,m_algorithms,Prediction domain,m_algorithms_6,Intended (spatial) prediction domain / area,suggestion,"global, regional, landscape, local",1,0,1
+8,Model,m,Learning method,m_algorithms,Bias,m_algorithms_7,Specify potential biases in the data or algorithmic decision-making,text,,1,1,1
+9,Model,m,Learning method,m_algorithms,Limitations,m_algorithms_8,Describe limitations in the use of the model,text,,0,1,1
+10,Model,m,Model validation and selection,m_validation,Validation strategy,m_validation_1,Details on the final validation of the model,suggestion,"Independent test, Random Cross-Validation, Spatial Cross-Validation, Spatio-Temporal Cross-Validation, Target-Oriented Cross-Validation, bootstrap",0,1,1
+11,Model,m,Model validation and selection,m_validation,Validation strategy,m_validation_2,Details on the validation strategy used for model selection,suggestion,"Independent test, Random Cross-Validation, Spatial Cross-Validation, Spatio-Temporal Cross-Validation, Target-Oriented Cross-Validation, bootstrap",1,1,1
+12,Model,m,Model validation and selection,m_validation,Performance metrics,m_validation_3,Performance metrics used,suggestion,"RMSE, MAE, Rsquared, adjusted Rsquared, Kappa, Accuracy, Confusion Matrix, AUC",1,1,1
+13,Model,m,Model validation and selection,m_validation,Hyperparameter tuning,m_validation_4,Methods for hyperparameter tuning (List tuning range and final value),text,,1,1,1
+14,Model,m,Model validation and selection,m_validation,Predictor selection,m_validation_5,Methods for selection of predictors,suggestion,"FFS, RFE, LASSO, Ridge",1,1,1
+15,Model,m,Model validation and selection,m_validation,Applicability,m_validation_6,Assessment of the spatial applicability of the model,suggestion,"AOA, MESS",0,0,1
+16,Model,m,Interpretation,m_interpretation,Sensitivity,m_estim_1,Assessment of the impact of varying input parameters or assumptions on the prediction,text,,1,1,1
+17,Model,m,Model estimates,m_interpretation,Explainability,m_estim_2,Methods of explainable AI used to gain insights into the models behaviour,suggestion,"SHAP, Permutation Importance, ALE, ICE, PDP, H-statistic",1,1,1
+18,Model,m,Model estimates,m_interpretation,Scientific interpretation,m_estim_3,Discuss the implications of the models results in the context of ecological theory / processes / management decisions,text,,1,1,1
+19,Model,m,Software,m_software,Software,m_software_1,Programming language and versioning of key libraries,text,,0,1,1
+20,Model,m,Software,m_software,Code availability,m_software_2,"Code availability (e.g., Link to Code Repository such as Github)",text,,0,1,1
+21,Model,m,Software,m_software,Data availability,m_software_3,"Data availability (e.g., Link to Data repository such as Fighsare)",text,,0,1,1
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+,,,,,,,,,,,,
+
