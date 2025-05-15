@@ -28,34 +28,12 @@ server <- function(input, output, session) {
   
   render_objective = function(element_id, element_placeholder){
     selectizeInput(inputId = element_id, label = NULL, multiple = F, options = list(create = T, placeholder = "Choose from list"),
-                   choices = list("", "Inference and explanation", "Mapping and interpolation", "Forecast and transfer"))
+                   choices = list("", "Inference and explanation", "Mapping and interpolation"))
   }
   
   render_suggestion = function(element_id, element_placeholder, suggestions){
     suggestions = sort(trimws(unlist(strsplit(suggestions, ","))))
     selectizeInput(inputId = element_id, label = element_placeholder, choices = suggestions, multiple = TRUE, options = list(create = T,  placeholder = "Choose from list or insert new values"))
-  }
-  
-  render_extent = function(element_id){
-    if(element_id == "o_scale_1"){
-      splitLayout(
-        cellWidths = c("170px",  "150px", "150px", "150px", "150px"),
-        p("Spatial extent (long/lat)", style = "padding: 9px 12px"),
-        textAreaInput(inputId = paste0(element_id, "_xmin"), label = "xmin", height = "45px", resize = "none"),
-        textAreaInput(inputId = paste0(element_id, "_xmax"), label = "xmax", height = "45px", resize = "none"),
-        textAreaInput(inputId = paste0(element_id, "_ymin"), label = "ymin", height = "45px", resize = "none"),
-        textAreaInput(inputId = paste0(element_id, "_ymax"), label = "ymax", height = "45px", resize = "none")
-      )
-    } else {
-      splitLayout(
-        cellWidths = c("120px",  "150px", "150px", "150px", "150px"),
-        p("Spatial extent", style = "padding: 9px 12px"),
-        textAreaInput(inputId = paste0(element_id, "_xmin"), label = "xmin", height = "45px", resize = "none"),
-        textAreaInput(inputId = paste0(element_id, "_xmax"), label = "xmax", height = "45px", resize = "none"),
-        textAreaInput(inputId = paste0(element_id, "_ymin"), label = "ymin", height = "45px", resize = "none"),
-        textAreaInput(inputId = paste0(element_id, "_ymax"), label = "ymax", height = "45px", resize = "none")
-      )
-    }
   }
   
   render_model_algorithm = function(element_id, element_placeholder){
@@ -92,7 +70,6 @@ server <- function(input, output, session) {
                                       author = render_authors(),
                                       objective = render_objective(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       suggestion = render_suggestion(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
-                                      extent = render_extent(section_dict$element_id[i]),
                                       model_algorithm = render_model_algorithm(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       model_setting = render_model_settings())
         
@@ -158,16 +135,6 @@ server <- function(input, output, session) {
     paste(authors$df$first_name, authors$df$last_name, collapse = ", ")
   }
   
-  knit_extent = function(element_id){
-    if(any(c(input[[paste0(element_id, "_xmin")]], input[[paste0(element_id, "_xmax")]], input[[paste0(element_id, "_ymin")]], input[[paste0(element_id, "_ymax")]]) == "")){
-      knit_missing(element_id)
-    } else {
-      element_value = paste(c(input[[paste0(element_id, "_xmin")]], input[[paste0(element_id, "_xmax")]], 
-                              input[[paste0(element_id, "_ymin")]], input[[paste0(element_id, "_ymax")]]), collapse = ", ")
-      cat("\nSpatial extent: ", element_value, " (xmin, xmax, ymin, ymax)\n", sep="")
-    }
-  }
-  
   knit_suggestion = function(element_id){
     if(is.null(input[[element_id]])){
       knit_missing(element_id)
@@ -228,52 +195,11 @@ server <- function(input, output, session) {
     }
   }
   
-  import_odmap_to_extent = function(element_id, values){
-    values = gsub("(^.*)( \\(xmin, xmax, ymin, ymax\\)$)", "\\1", values)
-    values_split = unlist(strsplit(values, ", "))
-    names(values_split) = c("xmin", "xmax", "ymin", "ymax")
-    for(i in 1:length(values_split)){
-      if(input[[paste0(element_id, "_", names(values_split[i]))]] == "" | input[["replace_values"]] == "Yes"){
-        updateTextAreaInput(session = session, inputId = paste0(element_id, "_", names(values_split[i])), value = as.numeric(values_split[i]))
-      }
-    }
-  }
-  
   import_odmap_to_model_algorithm = function(element_id, values){
     if(length(input[[element_id]]) == 0 | input[["replace_values"]] == "Yes"){
       values = unlist(strsplit(values, split = "; "))
       suggestions_new =  sort(trimws(c(model_settings$suggestions, as.character(values))))
       updateSelectizeInput(session = session, inputId = element_id, choices = suggestions_new, selected = values)  
-    }
-  }
-  
-  # RMMS import functions
-  import_rmm_to_text = function(element_id, values){
-    if(input[[element_id]] == "" | input[["replace_values"]] == "Yes"){
-      updateTextAreaInput(session = session, inputId = element_id, 
-                          value = paste(paste0(values, " (", names(values), ")"), collapse = ",\n"))
-    }
-  }
-  
-  import_rmm_to_authors = function(element_id, values){
-    if(nrow(authors$df) == 0 | input[["replace_values"]] == "Yes"){
-      names_split = unlist(strsplit(values[[1]], split = " and "))
-      names_split = strsplit(names_split, split = ", ")
-      authors$df = authors$df[0,] # Delete previous entries
-      for(i in 1:length(names_split)){
-        author_tmp = names_split[[i]]
-        authors$df = rbind(authors$df, data.frame("first_name" = author_tmp[2],  "last_name" = author_tmp[1]))
-      }
-    }
-  }
-  
-  import_rmm_to_extent = function(element_id, values){
-    values = trimws(unlist(strsplit(values[[1]], ";")))
-    for(i in 1:length(values)){
-      values_split = unlist(strsplit(values[i], ": "))
-      if(input[[paste0(element_id, "_", values_split[1])]] == "" | input[["replace_values"]] == "Yes"){
-        updateTextAreaInput(session = session, inputId = paste0(element_id, "_", values_split[1]), value = as.numeric(values_split[2]))
-      }
     }
   }
   
@@ -326,16 +252,6 @@ server <- function(input, output, session) {
     return(ifelse(!is.null(val), paste(input[[element_id]], collapse = "; "), NA))
   }
   
-  export_extent = function(element_id){
-    if(any(c(input[[paste0(element_id, "_xmin")]], input[[paste0(element_id, "_xmax")]], input[[paste0(element_id, "_ymin")]], input[[paste0(element_id, "_ymax")]]) == "")){
-      return(NA)
-    } else {
-      values = paste(c(input[[paste0(element_id, "_xmin")]], input[[paste0(element_id, "_xmax")]], 
-                       input[[paste0(element_id, "_ymin")]], input[[paste0(element_id, "_ymax")]]), collapse = ", ")
-      return(paste0(values, " (xmin, xmax, ymin, ymax)"))
-    }
-  }
-  
   export_model_setting = function(element_id){
     if(is.null(input[["o_algorithms_1"]])){
       return(NA)
@@ -359,12 +275,10 @@ server <- function(input, output, session) {
   # ------------------------------------------------------------------------------------------#
   # "Create a protocol" - mainPanel elements
   output$Overview_UI = render_section("Overview", odmap_dict)
-  output$Data_UI = render_section("Data", odmap_dict)
   output$Model_UI = render_section("Model", odmap_dict)
-  output$Assessment_UI = render_section("Assessment", odmap_dict)
   output$Prediction_UI = render_section("Prediction", odmap_dict)
   
-  for(tab in c("Overview_UI", "Data_UI", "Model_UI", "Assessment_UI", "Prediction_UI")){
+  for(tab in c("Overview_UI", "Model_UI", "Prediction_UI")){
     outputOptions(output, tab, suspendWhenHidden = FALSE) # Add tab contents to output object before rendering
   } 
   
@@ -376,7 +290,6 @@ server <- function(input, output, session) {
       all_elements = odmap_dict %>% 
         filter(section == sect & !element_id %in% unlist(elem_hidden) & !element_type %in% c("model_setting", "author")) %>% 
         filter(if(input$hide_optional) !element_id %in% elem_optional else T) %>% 
-        mutate(element_id = ifelse(element_type == "extent", paste0(element_id, "_xmin"), element_id)) %>%  
         pull(element_id)
       if(length(all_elements) == 0){
         next 
@@ -427,7 +340,6 @@ server <- function(input, output, session) {
                                            author = export_authors(odmap_download$element_id[i]),
                                            objective = export_standard(odmap_download$element_id[i]),
                                            suggestion = export_suggestion(odmap_download$element_id[i]),
-                                           extent = export_extent(odmap_download$element_id[i]),
                                            model_algorithm = export_suggestion(odmap_download$element_id[i]),
                                            model_setting = export_model_setting(odmap_download$element_id[i]),
                                            "") 
@@ -514,9 +426,7 @@ server <- function(input, output, session) {
                                                    unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(inference  == 0)), subsection_id)), # unused subsections
                                                    "p"),
                    "Prediction and mapping" =  c(pull(odmap_dict %>% filter(prediction == 0), element_id), 
-                                                 unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(prediction == 0)), subsection_id))),
-                   "Projection and transfer" =  c(pull(odmap_dict %>% filter(projection == 0), element_id),
-                                                  unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(projection  == 0)), subsection_id))))
+                                                 unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(prediction == 0)), subsection_id))))
   
   elem_optional = c(pull(odmap_dict %>% filter(optional == 1), element_id), # optional elements
                     unique(pull(odmap_dict %>% group_by(subsection_id) %>% filter(all(optional == 1)), subsection_id))) # optional subsections)
@@ -541,33 +451,37 @@ server <- function(input, output, session) {
     }
   })
   
-  # Extent Long/Lat
+  
+  
+  # -------------------------------------------
+  # Warning message for inappropriate CV strategy
   observe({
-    input_names = c("o_scale_1_xmin", "o_scale_1_xmax", "o_scale_1_ymax", "o_scale_1_ymin")
-    print_message = F
-    for(input_name in input_names){
-      if(grepl("xmin|xmax", input_name)){
-        value_range = c(-180, 180)
-      } else { 
-        value_range = c(-90, 90)
+    if (isTruthy(input$d_response_8) && isTruthy(input$m_validation_1)) {
+      if (input$d_response_8 == "clustered" && input$m_validation_1 == "Random Cross-Validation") {
+        showNotification("Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.", type = "warning")
       }
-      
-      if(is.null(input[[input_name]])){
-        next
-      } else if(input[[input_name]] == "") {
-        next
-      } else {
-        input_value = ifelse(is.na(as.numeric(input[[input_name]])), -999, as.numeric(input[[input_name]]))  # Check if input is valid number
-        if(input_value < value_range[1] | input_value > value_range[2]){
-          updateTextAreaInput(session = session, inputId = input_name, value = "")
-          print_message = T
-        }
-      }
-    }
-    if(print_message){
-      showNotification("Please enter valid latitude/longitude coordinates", duration = 3, type = "error")  
     }
   })
+  
+  
+  observe({
+    if (isTruthy(input$d_response_8) && isTruthy(input$m_validation_1)) {
+      if (input$d_response_8 == "random" && input$m_validation_1 == "Spatial Cross-Validation") {
+        showNotification("Warning: Spatial CV with randomly distributed samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.", type = "warning")
+      }
+    }
+  })
+  
+  
+  observe({
+    if (isTruthy(input$d_response_8) && isTruthy(input$p_eval_3)) {
+      if (input$d_response_8 == "random" && input$p_eval_3 == "None") {
+        showNotification("Warning: Many ML models are prone to extrapolation. It is strongly recommended\nto 
+                         delineate areas of extrapolation, and to communicate them as uncertain areas to the user of the prediction.", type = "warning")
+      }
+    }
+  })
+  
   
   # -------------------------------------------
   # Optional fields
@@ -713,7 +627,6 @@ server <- function(input, output, session) {
              author = import_odmap_to_authors(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
              objective = import_odmap_to_model_objective(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
              suggestion = import_suggestion(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
-             extent = import_odmap_to_extent(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
              model_algorithm = import_odmap_to_model_algorithm(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]),
              model_setting = import_model_settings(element_id = protocol_upload$element_id[i], values = protocol_upload$Value[i]))
     }
@@ -724,53 +637,4 @@ server <- function(input, output, session) {
     updateTabsetPanel(session, "Tabset", selected = "Overview")
   })
   
-  observeEvent(input$RMMS_to_input, {
-    protocol_upload = read.csv(input$upload$datapath, sep = ",", stringsAsFactors = F, na.strings = c("NA", "", "NULL")) %>% 
-      mutate(Value = trimws(Value)) %>% 
-      filter(!is.na(Value))
-    
-    # 1. Prepare imported values
-    if(nrow(protocol_upload>0)){
-        imported_values = list()
-        for(i in 1:nrow(protocol_upload)){ ## ignore first line?
-          rmm_fields = c(protocol_upload$Field.1[i], protocol_upload$Field.2[i], protocol_upload$Field.3[i])
-          rmm_fields = rmm_fields[!is.na(rmm_fields)]
-          rmm_fields = paste0(rmm_fields, collapse = "$")
-          rmm_entity = protocol_upload$Entity[i]
-          
-          odmap_subset = odmap_dict[grepl(rmm_fields, str_split(odmap_dict$rmm_fields, pattern = ","), fixed = T) & grepl(rmm_entity, str_split(odmap_dict$rmm_entities, pattern = ","), fixed = T),]
-          if(nrow(odmap_subset) == 1){
-            imported_values[[odmap_subset$element_id]][[paste(rmm_fields, rmm_entity, sep = "-")]] = protocol_upload$Value[i]
-          }
-        }
-        
-        model_settings = protocol_upload %>% 
-          dplyr::filter(Field.1 == "model" & Field.2 == "algorithm") %>% 
-          group_by(Field.3) %>% 
-          summarize(settings_string = paste(paste0(Entity, " (", Value, ")"), collapse = ", "))
-        
-        if(nrow(model_settings) > 0){
-          imported_values[["m_settings_1"]] = model_settings %>% 
-            ungroup() %>% 
-            summarize(x = paste(paste0(Field.3, ": ", settings_string), collapse = "; ")) %>% 
-            pull(x)
-        }
-        
-        # 2. Update ODMAP input fields with imported values
-        for(i in 1:length(imported_values)){
-          switch(odmap_dict$element_type[which(odmap_dict$element_id == names(imported_values)[i])],
-                 text = import_rmm_to_text(element_id = names(imported_values)[i], values = imported_values[[i]]),
-                 author = import_rmm_to_authors(element_id = names(imported_values)[i], values = imported_values[[i]]),
-                 suggestion = import_suggestion(element_id = names(imported_values)[i], values = unlist(imported_values[[i]])),
-                 extent = import_rmm_to_extent(element_id = names(imported_values)[i], values = imported_values[[i]]),
-                 model_setting = import_model_settings(element_id = names(imported_values)[i], values = imported_values[[i]]))
-        }
-        
-        # Switch to "Create a protocol" 
-        reset("upload")
-        updateNavbarPage(session, "navbar", selected = "create")
-        updateTabsetPanel(session, "Tabset", selected = "Overview")
-    }
-
-  })
 }

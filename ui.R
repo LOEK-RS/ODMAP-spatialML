@@ -25,29 +25,28 @@ ui <-  tagList(
     selected = "about",
   
     # HOME TAB
-    tabPanel("What is ODMAP?", value = "about", fluidPage(
+    tabPanel("What is STeMP?", value = "about", fluidPage(
       fluidRow(
         column(width = 2),
         column(width = 8, 
                p("What is ODMAP?", style = "padding-top: 10px; font-size: 30px; font-weight:bold;"),
-               p("Species distribution models (SDMs) constitute the most common class of biodiversity models. The advent of ready-to-use software packages and
-             increasing availability of digital geo-information have considerably assisted the application of SDMs in recent years  enabling their use in
-             informing conservation and management, and quantifying impacts from global change.", style= "font-size: 18px;"),
-               p("However, models must be fit for purpose, with all important aspects of their development and applications properly considered. 
-             Despite the widespread use of SDMs, the standardisation and documentation of model protocols remains limited. To address these issues, 
-             we propose a standard protocol for reporting SDMs. We call this the ODMAP (Overview, Data, Model, Assessment and Prediction) protocol
-             as each of its components reflects the main steps involved in building SDMs and other empirically-based biodiversity models (",a(href = 'https://doi.org/10.1111/ecog.04960', 'Zurell et al. 2020', target = "_blank", .noWS = "outside"),").", style= "font-size: 18px;"), 
+               p("Spatio-temporal modelling is a key method in the geosciences. Recently, the increasing availability of large datasets and
+                 new methods gave rise to the application of methods of machine-learning in spatio-temporal modelling.
+                 However, these models are often not sufficiently reported, and reproducing them often remains challenging.",
+                 style= "font-size: 18px;"),
+               p("Reproducibility and transparency of spatio-temporal models are key for
+                 interpreting, evaluating and reproducing them. This can be achieved by standardized model protocols.
+                 While there exist such protocols for machine-learning models in general (e.g., Model Cards, REFORMs), as well as for specific domains 
+                 like species distribution modelling (ODMAP), to date such protocols are lacking in the general field of spatio-temporal modelling.", 
+                 style= "font-size: 18px;"), 
                img(src = "workflow.jpg", width = "60%", style="display: block; margin-left: auto; margin-right: auto; min-width: 500px;"), br(),
-               p("The ODMAP protocol serves two main purposes. First, it provides a checklist for authors detailing key steps for model building and analyses. 
-             Second, it introduces a standard approach to documentation that ensures transparency and reproducibility, facilitating peer review and 
-             expert evaluation of model quality as well as meta-analyses.", style= "font-size: 18px;"),
-               p("This Shiny web application helps to implement the ODMAP approach and produces well formatted protocols that can be exported for further usage. 
-                 For further explanation please refer to the original publication (Zurell et al. 2020).", style= "font-size: 18px;"),
+               p("We propose a protocol for spatio-temporal models to fill this gap: STeMP. This protocol contains three major sections.
+                  To facilitate community engagement, the protocol is hosted on Github (). Any missing points or other feedback can be 
+                  submitted as a pull request, and the community can vote if it should be included in the protocol.",
+                 style= "font-size: 18px;"),
+               p("This Shiny web application helps to implement ", style= "font-size: 18px;"),
                em(p("Please cite as follows:", style = "font-size: 18px;")),
-               p("Zurell D, Franklin J, König C, Bouchet PJ, Serra-Diaz JM, Dormann CF, Elith J, Fandos Guzman G, Feng X, Guillera-Arroita G, Guisan A, Leitão PJ, 
-                 Lahoz-Monfort JJ, Park DS, Peterson AT,  Rapacciuolo G, Schmatz DR, Schröder B, Thuiller W, Yates KL, Zimmermann NE, Merow C (2020) 
-                 A standard protocol for describing species distribution models. Ecography 43: 1261-1277. DOI: ",
-                 a(href = 'https://doi.org/10.1111/ecog.04960', '10.1111/ecog.04960', target = "_blank", .noWS = "outside"), style= "font-size: 18px;")
+               p("abc", style= "font-size: 18px;")
         )),
       column(width = 2)
     )),
@@ -98,25 +97,15 @@ ui <-  tagList(
             uiOutput("Overview_UI")
           )),
           
-          tabPanel("2. Data", value = "Data", fluidPage(
-            em(p("Describe your your data in detail.", style = "padding-top: 10px; font-weight: 300")),
-            uiOutput("Data_UI")
-          )),
-          
-          tabPanel("3. Model", value = "Model", fluidPage(
+          tabPanel("2. Model", value = "Model", fluidPage(
             em(p("Describe your modeling approach in detail.", style = "padding-top: 10px; font-weight: 300")),
             uiOutput("Model_UI")
           )),
           
-          tabPanel("4. Assessment", value = "Assessment", fluidPage(
-            em(p("Describe how you assessed your model results.", style = "padding-top: 10px; font-weight: 300")),
-            uiOutput("Assessment_UI")
-          )),
-          
-          tabPanel("5. Prediction", value = "Prediction", fluidPage(
-            em(p("Describe your model predictions in detail.", style = "padding-top: 10px; font-weight: 300")),
+          tabPanel("3. Prediction", value = "Prediction", fluidPage(
+            em(p("Detail the models predictions.", style = "padding-top: 10px; font-weight: 300")),
             uiOutput("Prediction_UI")
-          )) 
+          ))
         ))
     )),
     
