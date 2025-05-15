@@ -451,6 +451,38 @@ server <- function(input, output, session) {
     }
   })
   
+  
+  
+  # -------------------------------------------
+  # Warning message for inappropriate CV strategy
+  observe({
+    if (isTruthy(input$d_response_8) && isTruthy(input$m_validation_1)) {
+      if (input$d_response_8 == "clustered" && input$m_validation_1 == "Random Cross-Validation") {
+        showNotification("Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.", type = "warning")
+      }
+    }
+  })
+  
+  
+  observe({
+    if (isTruthy(input$d_response_8) && isTruthy(input$m_validation_1)) {
+      if (input$d_response_8 == "random" && input$m_validation_1 == "Spatial Cross-Validation") {
+        showNotification("Warning: Spatial CV with randomly distributed samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.", type = "warning")
+      }
+    }
+  })
+  
+  
+  observe({
+    if (isTruthy(input$d_response_8) && isTruthy(input$p_eval_3)) {
+      if (input$d_response_8 == "random" && input$p_eval_3 == "None") {
+        showNotification("Warning: Many ML models are prone to extrapolation. It is strongly recommended\nto 
+                         delineate areas of extrapolation, and to communicate them as uncertain areas to the user of the prediction.", type = "warning")
+      }
+    }
+  })
+  
+  
   # -------------------------------------------
   # Optional fields
   observeEvent(input$hide_optional,{
