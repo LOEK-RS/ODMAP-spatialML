@@ -472,15 +472,26 @@ server <- function(input, output, session) {
     }
   })
   
-  
   observe({
     if (isTruthy(input$d_response_8) && isTruthy(input$p_eval_3)) {
-      if (input$d_response_8 == "random" && input$p_eval_3 == "None") {
-        showNotification("Warning: Many ML models are prone to extrapolation. It is strongly recommended\nto 
-                         delineate areas of extrapolation, and to communicate them as uncertain areas to the user of the prediction.", type = "warning")
+      if (input$d_response_8 == "clustered" && input$p_eval_3 == "None") {
+        showNotification("Warning: Clustered samples often lead to extrapolation when the model is applied to feature combinations not present in the training data.
+                         Identifying areas of extrapolation/uncertainty and communicating them to the user of the prediction is recommended.", type = "warning")
       }
     }
   })
+  
+  
+  observe({
+    if (isTruthy(input$d_response_8) && isTruthy(input$d_predictors_1)) {
+      if (input$d_response_8 == "clustered" && "Spatial Proxies" %in% input$d_predictors_1) {
+        showNotification("Warning: Using spatial proxies with clustered samples likely leads to extrapolation situations.\nYou might
+                         consider using physically relevant predictors instead.", type = "warning")
+      }
+    }
+  })
+  
+  
   
   
   # -------------------------------------------
@@ -488,7 +499,7 @@ server <- function(input, output, session) {
   observeEvent(input$hide_optional,{
     if(is.null(input$o_objective_1)){
       return(NULL)
-    } else if(input$hide_optional == T & input$o_objective_1 == ""){
+    } else if(input$hide_optional == T & input$o_objective_1 == ""){+
       showNotification("Please select a model objective under '1. Overview'", duration = 3, type = "message")
       Sys.sleep(0.3)
       updateMaterialSwitch(session, "hide_optional", value = F)

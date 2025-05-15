@@ -30,7 +30,7 @@
 8,Model,m,Parameter uncertainty and biases,m_bias,Bias,m_bias_1,Specify potential biases in the data or algorithmic decision-making,text,,1,1,1
 5,Prediction,m,Parameter uncertainty and biases,ḿ_bias,Sensitivity,m_bias_2,Assessment of the impact of varying input parameters or assumptions on the prediction,text,,1,1,1
 9,Model,m,Parameter uncertainty and biases,m_bias,Limitations,m_bias_3,Describe limitations in the use of the model,text,,0,1,1
-11,Model,m,Model validation and selection,m_validation,Validation strategy,m_validation_1,Details on the validation strategy used for model selection,suggestion,"Independent test, Random Cross-Validation, Spatial Cross-Validation, Spatio-Temporal Cross-Validation, Target-Oriented Cross-Validation, bootstrap",1,1,1
+11,Model,m,Model validation and selection,m_validation,Validation strategy,m_validation_1,Details on the validation strategy used for model selection,suggestion,"Independent probability sample, Random Cross-Validation, Spatial Cross-Validation, Spatio-Temporal Cross-Validation, Target-Oriented Cross-Validation, bootstrap",1,1,1
 12,Model,m,Model validation and selection,m_validation,Performance metrics,m_validation_2,Performance metrics used,suggestion,"RMSE, MAE, Rsquared, adjusted Rsquared, Kappa, Accuracy, Confusion Matrix, AUC",1,1,1
 13,Model,m,Model validation and selection,m_validation,Hyperparameter tuning,m_validation_3,Methods for hyperparameter tuning (List tuning range and final value),text,,1,1,1
 14,Model,m,Model validation and selection,m_validation,Predictor selection,m_validation_4,Methods for selection of predictors,suggestion,"FFS, RFE, LASSO, Ridge",1,1,1
@@ -40,55 +40,7 @@
 20,Model,m,Software,m_software,Code availability,m_software_2,"Code availability (e.g., Link to Code Repository such as Github)",text,,0,1,1
 21,Model,m,Software,m_software,Data availability,m_software_3,"Data availability (e.g., Link to Data repository such as Fighsare)",text,,0,1,1
 1,Prediction,p,Prediction domain,p_pred,Prediction domain,p_pred,Intended (spatial) prediction domain / area,suggestion,"global, regional, landscape, local",1,0,1
-2,Prediction,p,Evaluation and Uncertainty,p_uncertainty,Validation strategy,p_eval_1,Details on the evaluation of the prediction,suggestion,"Independent test, Random Cross-Validation, Spatial Cross-Validation, Spatio-Temporal Cross-Validation, Target-Oriented Cross-Validation, bootstrap",0,1,1
-4,Prediction,p,Evaluation and Uncertainty,p_uncertainty,Uncertainty qunatification,p_eval_3,Details on the uncertainty quantification method,suggestion,"AOA, MESS",1,1,1
+2,Prediction,p,Evaluation and Uncertainty,p_uncertainty,Validation strategy,p_eval_1,Details on the evaluation of the prediction,suggestion,"Independent probability sample, Random Cross-Validation, Spatial Cross-Validation, Spatio-Temporal Cross-Validation, Target-Oriented Cross-Validation, bootstrap",0,1,1
+4,Prediction,p,Evaluation and Uncertainty,p_uncertainty,Uncertainty qunatification,p_eval_3,Details on the uncertainty quantification method,suggestion,"AOA, MESS, None",1,1,1
 6,Prediction,p,Post-Processing,p_post,Threshold selection,p_post_1,"Details on threshold selection, if applicable: transforming continuous predictions into binary predictions",text,,1,0,1
 7,Prediction,p,Post-Processing,p_post,Post-processing,p_post_2,"Post-processing, e.g. Filter",text,,1,0,1
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-,,,,,,,,,,,,
-
