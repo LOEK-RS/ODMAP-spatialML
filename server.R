@@ -6,6 +6,9 @@ library(shinydashboard)
 library(DT)
 library(tidyverse)
 library(rangeModelMetadata)
+library(sf)
+library(ggplot2)
+
 
 odmap_dict = read.csv("www/odmap_dict.csv", header = T, stringsAsFactors = F)
 rmm_dict = rmmDataDictionary()
@@ -647,5 +650,35 @@ server <- function(input, output, session) {
     updateNavbarPage(session, "navbar", selected = "create")
     updateTabsetPanel(session, "Tabset", selected = "Overview")
   })
+  
+  
+  ## Upload gpkg --------------------
+  # Reactive expression to read the .gpkg file
+  uploaded_gpkg <- reactive({
+    req(input$gpkg_file)
+    
+    tryCatch({
+      st_read(input$gpkg_file$datapath)
+    }, error = function(e) {
+      showNotification("Failed to read .gpkg file.", type = "error")
+      NULL
+    })
+  })
+  
+  output$d_response_7 <- renderPlot({
+    gpkg_data <- uploaded_gpkg()
+    req(gpkg_data)
+    
+    ggplot(gpkg_data) +
+      geom_sf() +
+      ggtitle("Uploaded GeoPackage Data") +
+      theme_minimal()
+  })
+  
+  # This controls conditionalPanel visibility
+  output$showGpkgPlot <- reactive({
+    !is.null(input$gpkg_file)
+  })
+  outputOptions(output, "showGpkgPlot", suspendWhenHidden = FALSE)
   
 }

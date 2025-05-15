@@ -98,6 +98,20 @@ ui <-  tagList(
           )),
           
           tabPanel("2. Model", value = "Model", fluidPage(
+            
+            # Upload gpkg to generate plot of samples
+            tags$hr(),
+            h4("Optional Spatial Input (.gpkg)", style = "margin-top: 20px;"),
+            
+            fileInput("gpkg_file", "Upload GeoPackage (.gpkg)", accept = ".gpkg"),
+            
+            # Optional map output shown only if a file is uploaded
+            conditionalPanel(
+              condition = "output.showGpkgPlot == true",
+              plotOutput("d_response_7", height = "400px")
+            ),
+            tags$hr(),
+            
             em(p("Describe your modeling approach in detail.", style = "padding-top: 10px; font-weight: 300")),
             uiOutput("Model_UI")
           )),
@@ -123,11 +137,9 @@ ui <-  tagList(
         column(width = 2),
         column(width = 8, 
                p("There are two options for importing data into your ODMAP protocol", style = "font-size: 18px;"),
-               p(tags$b("(1) Upload an ODMAP protocol (.csv)"), br(), "This option is convenient if you want to edit or resume working on a previously saved ODMAP protocol.", style = "font-size: 18px;"),
-               p(tags$b("(2) Upload an RMM file (.RDS or .csv)"), br(), "The rangeModelMetaData package of Merow et al. (2019) allows exporting standardized metadata 
-                         for SDMs directly from R. Note that the objectives of ODMAP and RMM differ and not all fields can be mapped between both approaches. 
-                         This option is therefore not a replacement for filling out ODMAP, but may be helpful for e.g. documenting model settings or references. 
-                         If RMM values have been imported, the corresponding field and entity is indicated in parentheses as Field1($Field2)($Field3)-Entity)", style = "font-size: 18px;"),
+              # Add this section for GPKG upload
+       p(tags$b("(1) Upload an ODMAP protocol (.csv)"), br(), "This option is convenient if you want to edit or resume working on a previously saved ODMAP protocol.", style = "font-size: 18px;"),
+
                p("Choose file", style = "font-size: 18px; font-weight: bold"),
                fileInput("upload", label = NULL, accept = c(".csv")),
                uiOutput("Upload_UI")),
