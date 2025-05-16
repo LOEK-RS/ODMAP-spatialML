@@ -35,12 +35,187 @@ server <- function(input, output, session) {
                    choices = list("", "Inference and explanation", "Mapping and interpolation"))
   }
   
-  auto_selected <- reactiveVal(NULL)
   
+  ##### Infer information from model objects
+  # Initialize reactive values to store the training sample count etc.
+  num_training_samples <- reactiveVal(NULL)
+  num_predictors <- reactiveVal(NULL)
+  names_predictors <- reactiveVal(NULL)
+  model_algorithm <- reactiveVal(NULL)
+  model_type <- reactiveVal(NULL)
+  model_hyperparams <- reactiveVal(NULL)
+  num_classes <- reactiveVal(NULL)
+  num_samples_per_class <- reactiveVal(NULL)
+  interpolation_range <- reactiveVal(NULL)
+  
+  # When caret model is uploaded, read it and extract training set size
+  observeEvent(input$caret_model, {
+    req(input$caret_model)
+    
+    model <- tryCatch({
+      readRDS(input$caret_model$datapath)
+    }, error = function(e) {
+      showNotification("Invalid RDS file or failed to load caret model.", type = "error")
+      return(NULL)
+    })
+    
+    # Training sample count
+    if (!is.null(model$trainingData)) {
+      num_training_samples(nrow(model$trainingData))
+    } 
+    
+    # Number of predictors
+    if (!is.null(model$trainingData)) {
+      num_predictors(ncol(model$trainingData)-1)
+    } 
+    
+    # Names of predictors
+    if (!is.null(model$trainingData)) {
+      names_predictors(paste(names(model$trainingData[,-1]), collapse = ", "))
+    } 
+    
+    # Hyperparameters
+    if (!is.null(model$bestTune)) {
+      model_hyperparams(paste0(names(model$bestTune), "=", model$bestTune, collapse = ","))
+    } else {
+      model_hyperparams(NULL)
+    }    
+    
+    
+    # Algorithm type
+    if (!is.null(model$method)) {
+      model_algorithm(model$method)
+    }
+    
+    # Determine regression or classification
+    if (!is.null(model$modelType)) {
+      model_type(model$modelType)
+    } else if (!is.null(model$trainingData)) {
+      # Infer from response variable type
+      response <- model$trainingData[, 1]
+      if (is.factor(response)) {
+        model_type("Classification")
+      } else {
+        model_type("Regression")
+      }
+    }
+    
+    if(model_type() != "Classification") {
+      interpolation_range(paste(round(range(model$trainingData$.outcome),3), collapse=" to "))
+    } else {
+      num_classes(length(unique(model$trainingData$.outcome)))
+      num_samples_per_class(paste0(names(table(model$trainingData$.outcome)), ": ", table(model$trainingData$.outcome), collapse = ", "))
+    }
+    
+  })
+  
+  render_n_samples = function(element_id, element_placeholder) {
+      if (!is.null(num_training_samples())) {
+        tagList(
+          numericInput("d_response_3", "Number of Training Samples", value = num_training_samples()),
+        )
+      } else {
+        numericInput("d_response_3", "Number of Training Samples", value = NULL)
+      }
+  }
+  
+  render_n_predictors = function(element_id, element_placeholder) {
+    if (!is.null(num_predictors())) {
+      tagList(
+        numericInput("d_predictors_2", "Number of Predictors", value = num_predictors()),
+      )
+    } else {
+      numericInput("d_predictors_2", "Number of Predictors", value = NULL)
+    }
+  }
+  
+  render_n_classes = function(element_id, element_placeholder) {
+    if (!is.null(num_classes())) {
+      tagList(
+        numericInput("d_response_4", "Number of Classes", value = num_classes()),
+      )
+    } else {
+      numericInput("d_response_4", "Number of Classes", value = NULL)
+    }
+  }
+  
+  render_n_samples_class = function(element_id, element_placeholder) {
+    if (!is.null(num_samples_per_class())) {
+      tagList(
+        textInput("d_response_5", "Number of Samples per Class", value = num_samples_per_class()),
+      )
+    } else {
+      textInput("d_response_5", "Number of Samples per Class", value = NULL)
+    }
+  }
+  
+  render_range = function(element_id, element_placeholder) {
+    if (!is.null(interpolation_range())) {
+      tagList(
+        textInput("d_response_6", "Response range", value = interpolation_range()),
+      )
+    } else {
+      textInput("d_response_6", "Response range", value = NULL)
+    }
+  }
+  
+  render_names_predictors = function(element_id, element_placeholder) {
+    if (!is.null(names_predictors())) {
+      tagList(
+        textInput("d_predictors_3", "Names of Predictors", value = names_predictors()),
+      )
+    } else {
+      textInput("d_predictors_3", "Names of Predictors", value = NULL)
+    }
+  } 
+  
+  render_hyperparameters = function(element_id, element_placeholder) {
+    if (!is.null(model_hyperparams())) {
+      tagList(
+        textInput("m_validation_3", "Names of Predictors", value = model_hyperparams()),
+      )
+    } else {
+      textInput("m_validation_3", "Names of Predictors", value = NULL)
+    }
+  } 
+  
+  render_model_type = function(element_id, element_placeholder) {
+    selectInput("m_algorithms_1", "Model Type",
+                choices = c("", "Classification", "Regression"),
+                selected = model_type())
+    
+  }
+  
+  render_model_algorithm = function(element_id, element_placeholder) {
+    # Default list of known algorithms
+    default_algos <- c("rf", "gbm", "glm", "svmRadial", "nnet", "rpart")
+    selected_algo <- model_algorithm()
+    
+    # Ensure the selected algorithm is in the choices
+    algo_choices <- if (!is.null(selected_algo) && !(selected_algo %in% default_algos)) {
+      c(default_algos, selected_algo)
+    } else {
+      default_algos
+    }
+    
+    selectInput(
+        "d_response_2", "Algorithm",
+        choices = c("", unique(algo_choices)),
+        selected = selected_algo
+      )
+    
+  }
+  
+  observeEvent(model_type(), {
+    if (!is.null(model_type()) && !is.null(model_algorithm()) && !is.null(num_training_samples())) {
+      showNotification("Model details filled from uploaded .RDS", type = "message")
+    }
+  })
+  
+  auto_selected <- reactiveVal(NULL)
   render_design = function(element_id, element_placeholder){
     
     auto_val <- NULL
-    
     
     if (!is.null(input$gpkg_file) && !is.null(input$gpkg_file_2)) {
       samples <- tryCatch({
@@ -74,7 +249,6 @@ server <- function(input, output, session) {
       }
     }
     
-    
     observe({
       if (!is.null(auto_selected())) {
         showNotification(paste("Sampling design was automatically set to:", auto_selected()),
@@ -95,15 +269,13 @@ server <- function(input, output, session) {
                   selected = auto_val)
     }
   }
+
   
   render_suggestion = function(element_id, element_placeholder, suggestions){
     suggestions = sort(trimws(unlist(strsplit(suggestions, ","))))
     selectizeInput(inputId = element_id, label = element_placeholder, choices = suggestions, multiple = TRUE, options = list(create = T,  placeholder = "Choose from list or insert new values"))
   }
-  
-  render_model_algorithm = function(element_id, element_placeholder){
-    selectizeInput(inputId = element_id, label = element_placeholder, choices = model_settings$suggestions, multiple = TRUE, options = list(create = T,  placeholder = "Choose from list or insert new values"))
-  }
+
   
   render_model_settings = function(){
     div(
@@ -134,10 +306,25 @@ server <- function(input, output, session) {
                                       text = render_text(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       author = render_authors(),
                                       objective = render_objective(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      sample_size = render_n_samples(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      n_predictors = render_n_predictors(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      names_predictors = render_names_predictors(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      n_classes = render_n_classes(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      n_samples_per_class = render_n_samples_class(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      interpolation_range = render_range(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      hyperparams = render_hyperparameters(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      
+                                      model_type = render_model_type(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      model_algorithm = render_model_algorithm(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
                                       sampling_design = render_design(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       
                                       suggestion = render_suggestion(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
-                                      model_algorithm = render_model_algorithm(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       model_setting = render_model_settings())
         
         # Third element: Next/previous button
@@ -772,5 +959,6 @@ server <- function(input, output, session) {
     !is.null(input$gpkg_file_2)
   })
   outputOptions(output, "showGpkgPlot2", suspendWhenHidden = FALSE)
+  
   
 }

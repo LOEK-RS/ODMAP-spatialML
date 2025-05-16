@@ -101,12 +101,19 @@ ui <-  tagList(
             
             em(p("Describe your modeling approach in detail.", style = "padding-top: 10px; font-weight: 300")),
             
+            # Upload model object
+            tags$hr(),
+            h4("Optional Upload of model data", style = "margin-top: 20px;"),
+            tags$hr(),
+            fileInput("caret_model", "Upload caret model (.RDS)", accept = ".rds"),
+            tags$hr(),
+            
+            
             # Upload gpkg to generate plot of samples
             tags$hr(),
             h4("Optional Spatial Input (.gpkg)", style = "margin-top: 20px;"),
             tags$hr(),
-            h5("Sample locations (.gpkg)", style = "margin-top: 20px;"),
-            fileInput("gpkg_file", "Upload GeoPackage (.gpkg)", accept = ".gpkg"),
+            fileInput("gpkg_file", "Upload Sample locations (.gpkg)", accept = ".gpkg"),
             
             # Optional map output shown only if a file is uploaded
             conditionalPanel(
@@ -115,9 +122,7 @@ ui <-  tagList(
             ),
             
             # Upload gpkg to generate plot of prediction area
-            h5("Prediction area (.gpkg)", style = "margin-top: 20px;"),
-            
-            fileInput("gpkg_file_2", "Upload Second GeoPackage (.gpkg)", accept = ".gpkg"),
+            fileInput("gpkg_file_2", "Upload Prediction area (.gpkg)", accept = ".gpkg"),
             
             conditionalPanel(
               condition = "output.showGpkgPlot2 == true",
