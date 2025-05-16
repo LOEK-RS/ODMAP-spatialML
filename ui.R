@@ -99,10 +99,13 @@ ui <-  tagList(
           
           tabPanel("2. Model", value = "Model", fluidPage(
             
+            em(p("Describe your modeling approach in detail.", style = "padding-top: 10px; font-weight: 300")),
+            
             # Upload gpkg to generate plot of samples
             tags$hr(),
             h4("Optional Spatial Input (.gpkg)", style = "margin-top: 20px;"),
-            
+            tags$hr(),
+            h5("Sample locations (.gpkg)", style = "margin-top: 20px;"),
             fileInput("gpkg_file", "Upload GeoPackage (.gpkg)", accept = ".gpkg"),
             
             # Optional map output shown only if a file is uploaded
@@ -110,10 +113,21 @@ ui <-  tagList(
               condition = "output.showGpkgPlot == true",
               plotOutput("d_response_7", height = "400px")
             ),
+            
+            # Upload gpkg to generate plot of prediction area
+            h5("Prediction area (.gpkg)", style = "margin-top: 20px;"),
+            
+            fileInput("gpkg_file_2", "Upload Second GeoPackage (.gpkg)", accept = ".gpkg"),
+            
+            conditionalPanel(
+              condition = "output.showGpkgPlot2 == true",
+              plotOutput("p_pred", height = "400px")
+            ),
             tags$hr(),
             
-            em(p("Describe your modeling approach in detail.", style = "padding-top: 10px; font-weight: 300")),
-            uiOutput("Model_UI")
+            uiOutput("Model_UI"),
+            
+            
           )),
           
           tabPanel("3. Prediction", value = "Prediction", fluidPage(

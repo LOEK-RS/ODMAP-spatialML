@@ -14,7 +14,7 @@
 5,Model,m,Response,m_response,Samples per class,d_response_5,Samples per class,text,,1,1,1
 6,Model,m,Response,m_response,Range,d_response_6,Interpolation range,text,,1,1,1
 7,Model,m,Response,m_response,Sampling locations,d_response_7,Sampling locations,text,,1,1,1
-8,Model,m,Response,m_response,Sampling design,d_response_8,Sampling design,suggestion,"random, uniform, stratified, clustered",0,1,1
+8,Model,m,Response,m_response,Sampling design,d_response_8,Sampling design,sampling_design,,0,1,1
 9,Model,m,Response,m_response,Coordinate Reference System,d_response_9,Coordinate Reference System (epsg),text,,1,1,1
 10,Model,m,Response,m_response,Data sources,d_response_10,Data sources,text,,1,1,1
 11,Model,m,Predictors,m_predictors,Predictor types,d_predictors_1,Type of predictor variables: choose from list or insert new values,suggestion,"Remote Sensing Images, Simulated Data, Spatial Proxies",0,1,1

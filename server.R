@@ -8,6 +8,7 @@ library(tidyverse)
 library(rangeModelMetadata)
 library(sf)
 library(ggplot2)
+library(CAST)
 
 
 odmap_dict = read.csv("www/odmap_dict.csv", header = T, stringsAsFactors = F)
@@ -32,6 +33,67 @@ server <- function(input, output, session) {
   render_objective = function(element_id, element_placeholder){
     selectizeInput(inputId = element_id, label = NULL, multiple = F, options = list(create = T, placeholder = "Choose from list"),
                    choices = list("", "Inference and explanation", "Mapping and interpolation"))
+  }
+  
+  auto_selected <- reactiveVal(NULL)
+  
+  render_design = function(element_id, element_placeholder){
+    
+    auto_val <- NULL
+    
+    
+    if (!is.null(input$gpkg_file) && !is.null(input$gpkg_file_2)) {
+      samples <- tryCatch({
+        st_read(input$gpkg_file$datapath, quiet = TRUE)
+      }, error = function(e) NULL)
+      
+      prediction_area <- tryCatch({
+        st_read(input$gpkg_file_2$datapath, quiet = TRUE)
+      }, error = function(e) NULL)
+      
+      if (!is.null(samples) && !is.null(prediction_area)) {
+        
+        samples <- st_transform(samples, st_crs(prediction_area))
+        
+        # sampling design
+        geod <- CAST::geodist(samples, modeldomain = prediction_area)
+
+        Gj <- geod[geod$what == "sample-to-sample",]$dist
+        Gij <- geod[geod$what == "prediction-to-sample",]$dist
+        
+        testks <- suppressWarnings(stats::ks.test(Gj, Gij, alternative = "great"))
+        
+        if(testks$p.value >= 0.05) {
+          auto_val <- "random"
+          auto_selected("random")
+        } else {
+          auto_val <- "clustered"
+          auto_selected("clustered")
+        }
+        
+      }
+    }
+    
+    
+    observe({
+      if (!is.null(auto_selected())) {
+        showNotification(paste("Sampling design was automatically set to:", auto_selected()),
+                         type = "message", duration = 5)
+      }
+    })
+    
+    # Create dropdown menu
+    if (is.null(auto_val)) {
+      # No preselection
+      selectInput("sampling_design", "Sampling Design",
+                  choices = c("", "clustered", "random", "stratified"),
+                  selected = "")
+    } else {
+      # Preselect inferred value
+      selectInput("sampling_design", "Sampling Design",
+                  choices = c("clustered", "random", "stratified"),
+                  selected = auto_val)
+    }
   }
   
   render_suggestion = function(element_id, element_placeholder, suggestions){
@@ -72,6 +134,8 @@ server <- function(input, output, session) {
                                       text = render_text(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       author = render_authors(),
                                       objective = render_objective(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      sampling_design = render_design(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
                                       suggestion = render_suggestion(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
                                       model_algorithm = render_model_algorithm(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       model_setting = render_model_settings())
@@ -455,7 +519,6 @@ server <- function(input, output, session) {
   })
   
   
-  
   # -------------------------------------------
   # Warning message for inappropriate CV strategy
   observe({
@@ -680,5 +743,34 @@ server <- function(input, output, session) {
     !is.null(input$gpkg_file)
   })
   outputOptions(output, "showGpkgPlot", suspendWhenHidden = FALSE)
+  
+  
+  
+  ## Plot prediction area -------------------------
+  uploaded_gpkg_2 <- reactive({
+    req(input$gpkg_file_2)
+    
+    tryCatch({
+      st_read(input$gpkg_file_2$datapath)
+    }, error = function(e) {
+      showNotification("Failed to read second .gpkg file.", type = "error")
+      NULL
+    })
+  })
+  
+  output$p_pred <- renderPlot({
+    gpkg_data2 <- uploaded_gpkg_2()
+    req(gpkg_data2)
+    
+    ggplot(gpkg_data2) +
+      geom_sf() +
+      ggtitle("Second GeoPackage Data") +
+      theme_minimal()
+  })
+  
+  output$showGpkgPlot2 <- reactive({
+    !is.null(input$gpkg_file_2)
+  })
+  outputOptions(output, "showGpkgPlot2", suspendWhenHidden = FALSE)
   
 }
