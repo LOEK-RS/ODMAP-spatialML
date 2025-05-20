@@ -709,8 +709,8 @@ server <- function(input, output, session) {
   # -------------------------------------------
   # Warning message for inappropriate CV strategy
   observe({
-    if (isTruthy(input$d_response_8) && isTruthy(input$m_validation_1)) {
-      if (input$d_response_8 == "clustered" && input$m_validation_1 == "Random Cross-Validation") {
+    if (isTruthy(input$sampling_design) && isTruthy(input$m_validation_1)) {
+      if (input$sampling_design == "clustered" && input$m_validation_1 == "Random Cross-Validation") {
         showNotification("Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.", type = "warning")
       }
     }
@@ -718,16 +718,16 @@ server <- function(input, output, session) {
   
   
   observe({
-    if (isTruthy(input$d_response_8) && isTruthy(input$m_validation_1)) {
-      if (input$d_response_8 == "random" && input$m_validation_1 == "Spatial Cross-Validation") {
+    if (isTruthy(input$sampling_design) && isTruthy(input$m_validation_1)) {
+      if (input$sampling_design == "random" && input$m_validation_1 == "Spatial Cross-Validation") {
         showNotification("Warning: Spatial CV with randomly distributed samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.", type = "warning")
       }
     }
   })
   
   observe({
-    if (isTruthy(input$d_response_8) && isTruthy(input$p_eval_3)) {
-      if (input$d_response_8 == "clustered" && input$p_eval_3 == "None") {
+    if (isTruthy(input$sampling_design) && isTruthy(input$p_eval_3)) {
+      if (input$sampling_design == "clustered" && input$p_eval_3 == "None") {
         showNotification("Warning: Clustered samples often lead to extrapolation when the model is applied to feature combinations not present in the training data.
                          Identifying areas of extrapolation/uncertainty and communicating them to the user of the prediction is recommended.", type = "warning")
       }
@@ -736,8 +736,8 @@ server <- function(input, output, session) {
   
   
   observe({
-    if (isTruthy(input$d_response_8) && isTruthy(input$d_predictors_1)) {
-      if (input$d_response_8 == "clustered" && "Spatial Proxies" %in% input$d_predictors_1) {
+    if (isTruthy(input$sampling_design) && isTruthy(input$d_predictors_1)) {
+      if (input$sampling_design == "clustered" && "Spatial Proxies" %in% input$d_predictors_1) {
         showNotification("Warning: Using spatial proxies with clustered samples likely leads to extrapolation situations.\nYou might
                          consider using physically relevant predictors instead.", type = "warning")
       }
