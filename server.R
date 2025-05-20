@@ -9,6 +9,9 @@ library(rangeModelMetadata)
 library(sf)
 library(ggplot2)
 library(CAST)
+library(parsnip)
+library(workflows)
+library(mlr3)
 
 
 odmap_dict = read.csv("www/odmap_dict.csv", header = T, stringsAsFactors = F)
@@ -36,8 +39,8 @@ server <- function(input, output, session) {
   }
   
   
-  ##### Infer information from model objects
-  # Initialize reactive values to store the training sample count etc.
+  ##### Infer information from model objects---------------
+  # Initialize reactive values to store the training sample count etc. 
   num_training_samples <- reactiveVal(NULL)
   num_predictors <- reactiveVal(NULL)
   names_predictors <- reactiveVal(NULL)
@@ -49,66 +52,131 @@ server <- function(input, output, session) {
   interpolation_range <- reactiveVal(NULL)
   
   # When caret model is uploaded, read it and extract training set size
-  observeEvent(input$caret_model, {
-    req(input$caret_model)
+  observeEvent(input$model_upload, {
     
+    req(input$model_upload)
+    
+    # Reset reactive values if new model object is uploaded
+    model_type(NULL)
+    model_algorithm(NULL)
+    model_hyperparams(NULL)
+    num_predictors(NULL)
+    names_predictors(NULL)
+    num_training_samples(NULL)
+    num_classes(NULL)
+    num_samples_per_class(NULL)
+    interpolation_range(NULL)
+    
+    
+    # read model --------
     model <- tryCatch({
-      readRDS(input$caret_model$datapath)
+      readRDS(input$model_upload$datapath)
     }, error = function(e) {
-      showNotification("Invalid RDS file or failed to load caret model.", type = "error")
+      showNotification("Invalid RDS file or failed to load model.", type = "error")
       return(NULL)
     })
-    
-    # Training sample count
-    if (!is.null(model$trainingData)) {
-      num_training_samples(nrow(model$trainingData))
-    } 
-    
-    # Number of predictors
-    if (!is.null(model$trainingData)) {
-      num_predictors(ncol(model$trainingData)-1)
-    } 
-    
-    # Names of predictors
-    if (!is.null(model$trainingData)) {
-      names_predictors(paste(names(model$trainingData[,-1]), collapse = ", "))
-    } 
-    
-    # Hyperparameters
-    if (!is.null(model$bestTune)) {
-      model_hyperparams(paste0(names(model$bestTune), "=", model$bestTune, collapse = ","))
-    } else {
-      model_hyperparams(NULL)
-    }    
-    
-    
-    # Algorithm type
-    if (!is.null(model$method)) {
-      model_algorithm(model$method)
-    }
-    
-    # Determine regression or classification
-    if (!is.null(model$modelType)) {
-      model_type(model$modelType)
-    } else if (!is.null(model$trainingData)) {
-      # Infer from response variable type
-      response <- model$trainingData[, 1]
-      if (is.factor(response)) {
-        model_type("Classification")
-      } else {
-        model_type("Regression")
+
+    # --------------------------------------
+    # Caret model
+    # --------------------------------------
+    if ("train" %in% class(model)) {
+      if (!is.null(model$trainingData)) {
+        num_training_samples(nrow(model$trainingData))
+        num_predictors(ncol(model$trainingData) - 1)
+        names_predictors(paste(names(model$trainingData[, -1]), collapse = ", "))
       }
-    }
-    
-    if(model_type() != "Classification") {
-      interpolation_range(paste(round(range(model$trainingData$.outcome),3), collapse=" to "))
+      
+      if (!is.null(model$bestTune)) {
+        model_hyperparams(paste0(names(model$bestTune), "=", model$bestTune, collapse = ","))
+      }
+      
+      model_algorithm(model$method)
+      
+      if (!is.null(model$modelType)) {
+        model_type(model$modelType)
+      } else {
+        response <- model$trainingData[, 1]
+        model_type(if (is.factor(response)) "Classification" else "Regression")
+      }
+      
+      if (model_type() == "Classification") {
+        num_classes(length(unique(model$trainingData$.outcome)))
+        num_samples_per_class(paste0(names(table(model$trainingData$.outcome)), ": ", table(model$trainingData$.outcome), collapse = ", "))
+      } else {
+        interpolation_range(paste(round(range(model$trainingData$.outcome), 3), collapse = " to "))
+      }
+      
+      # --------------------------------------
+      # Tidymodels (workflows, parsnip fits)
+      # --------------------------------------
+    } else if ("workflow" %in% class(model) || "model_fit" %in% class(model)) {
+      fit <- if ("workflow" %in% class(model)) extract_fit_parsnip(model) else model
+      data <- tryCatch(extract_mold(model), error = function(e) NULL)
+      
+      if (!is.null(fit)) {
+        model_algorithm(fit$spec$engine)
+        model_type(fit$spec$mode)
+        
+        if (!is.null(fit$spec$args)) {
+          model_hyperparams(paste0(names(fit$spec$args), "=", unlist(fit$spec$args), collapse = ","))
+        }
+      }
+      
+      if (!is.null(data)) {
+        num_training_samples(nrow(data$outcomes))
+        num_predictors(ncol(data$predictors))
+        names_predictors(paste(names(data$predictors), collapse = ", "))
+        if (is.factor(data$outcomes[[1]])) {
+          num_classes(length(unique(data$outcomes[[1]])))
+          num_samples_per_class(paste0(names(table(data$outcomes[[1]])), ": ", table(data$outcomes[[1]]), collapse = ", "))
+        } else {
+          interpolation_range(paste(round(range(data[[1]]), 3), collapse = " to "))
+        }
+      }
+      # --------------------------------------
+      # mlr3 models
+      # --------------------------------------
+    } else if ("Learner" %in% class(model) || "GraphLearner" %in% class(model)) {
+      if (!is.null(model$predict_type)) {
+        model_type(if (grepl("classif", model$id)) "Classification" else "Regression")
+      }
+      
+      model_algorithm(model$label)
+      
+      if (!is.null(model$param_set$values)) {
+        model_hyperparams(paste0(names(model$param_set$values), "=", unlist(model$param_set$values), collapse = ","))
+      }
+      
+      if (!is.null(model$training_data)) {
+        target <- model$training_data[[model$task$target_names]]
+        num_training_samples(nrow(model$training_data))
+        num_predictors(ncol(model$training_data) - 1)
+        names_predictors(paste(setdiff(names(model$training_data), model$task$target_names), collapse = ", "))
+        
+        if (is.factor(target)) {
+          num_classes(length(unique(target)))
+          num_samples_per_class(paste0(names(table(target)), ": ", table(target), collapse = ", "))
+        } else {
+          interpolation_range(paste(round(range(target), 3), collapse = " to "))
+        }
+      } else {
+        
+        num_training_samples(model$model$num.samples)
+        num_predictors(length(model$model$forest$independent.variable.names))
+        names_predictors(paste(model$model$forest$independent.variable.names, collapse = ", "))
+        
+        if (isTRUE(grepl("classif", model$id))) {
+          num_classes(length(model$model$forest$levels))
+        } 
+        
+      }
     } else {
-      num_classes(length(unique(model$trainingData$.outcome)))
-      num_samples_per_class(paste0(names(table(model$trainingData$.outcome)), ": ", table(model$trainingData$.outcome), collapse = ", "))
+      showNotification("Unsupported model type uploaded. Supported: caret, tidymodels, mlr3.", type = "error")
     }
     
   })
   
+  # Render UI for extracted model information
   render_n_samples = function(element_id, element_placeholder) {
       if (!is.null(num_training_samples())) {
         tagList(
@@ -172,10 +240,10 @@ server <- function(input, output, session) {
   render_hyperparameters = function(element_id, element_placeholder) {
     if (!is.null(model_hyperparams())) {
       tagList(
-        textInput("m_validation_3", "Names of Predictors", value = model_hyperparams()),
+        textInput("m_validation_3", "Hyperparameter values", value = model_hyperparams()),
       )
     } else {
-      textInput("m_validation_3", "Names of Predictors", value = NULL)
+      textInput("m_validation_3", "Hyperparameter values", value = NULL)
     }
   } 
   
@@ -199,7 +267,7 @@ server <- function(input, output, session) {
     }
     
     selectInput(
-        "d_response_2", "Algorithm",
+        "m_algorithms_2", "Algorithm",
         choices = c("", unique(algo_choices)),
         selected = selected_algo
       )

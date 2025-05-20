@@ -105,7 +105,7 @@ ui <-  tagList(
             tags$hr(),
             h4("Optional Upload of model data", style = "margin-top: 20px;"),
             tags$hr(),
-            fileInput("caret_model", "Upload caret model (.RDS)", accept = ".rds"),
+            fileInput("model_upload", "Upload trained model (.RDS)", accept = ".rds"),
             tags$hr(),
             
             
