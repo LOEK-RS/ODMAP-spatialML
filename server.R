@@ -280,18 +280,103 @@ server <- function(input, output, session) {
     }
   })
   
+  
+  ## Extract information from uploaded spatial objects ----------
+  samples_crs <- reactiveVal(NULL)
   auto_selected <- reactiveVal(NULL)
+  samples_valid <- reactiveVal(TRUE)
+  prediction_valid <- reactiveVal(TRUE)
+  
+  # check if prediction area is valid
+  observeEvent(input$prediction_upload, {
+    req(input$prediction_upload)
+    
+    prediction_valid(TRUE)  # reset
+    auto_selected(NULL)
+    
+    prediction_area <- tryCatch({
+      st_read(input$prediction_upload$datapath, quiet = TRUE)
+    }, error = function(e) {
+      showNotification("Could not read prediction area file.", type = "error")
+      return(NULL)
+    })
+    
+    if (!is.null(prediction_area)) {
+      geom_type <- unique(st_geometry_type(prediction_area))
+      if (!all(geom_type %in% c("POLYGON", "MULTIPOLYGON"))) {
+        showNotification("Prediction area must contain only POLYGON geometries.", type = "error")
+        prediction_valid(FALSE)
+      }
+    }
+  })
+  
+  # check if samples are valid
+  observeEvent(input$samples_upload, {
+    req(input$samples_upload)
+    
+    samples_valid(TRUE)  # reset
+    auto_selected(NULL)
+    
+    samples <- tryCatch({
+      st_read(input$samples_upload$datapath, quiet = TRUE)
+    }, error = function(e) {
+      showNotification("Could not read samples file.", type = "error")
+      return(NULL)
+    })
+    
+    if (!is.null(samples)) {
+      geom_type <- unique(st_geometry_type(samples))
+      if (!all(geom_type %in% c("POINT", "MULTIPOINT"))) {
+        showNotification("Samples file must contain only POINT geometries.", type = "error")
+        samples_valid(FALSE)
+      }
+    }
+  })
+  
+  # When samples are uploaded, extract epsg string
+  observeEvent(input$samples_upload, {
+    
+    req(samples_valid())
+    req(input$samples_upload)
+    
+    # Reset reactive values if new model object is uploaded
+    samples_crs(NULL)
+    
+    # read data --------
+    samples <- tryCatch({
+      st_read(input$samples_upload$datapath)
+    }, error = function(e) {
+      showNotification("Invalid .gpkg file or failed to load model.", type = "error")
+      return(NULL)
+    })
+    
+    # Check if samples are a POINT geometry
+    samples_crs(st_crs(samples)$epsg)
+      
+  })
+  
+  
+  render_crs = function(element_id, element_placeholder) {
+    textInput(
+      inputId = element_id,
+      label = "Coordinate Reference System (epsg)",
+      value = samples_crs()  # NULL if unset
+    )
+  } 
+  
   render_design = function(element_id, element_placeholder){
+    
+    req(samples_valid(), prediction_valid())
     
     auto_val <- NULL
     
-    if (!is.null(input$gpkg_file) && !is.null(input$gpkg_file_2)) {
+    if (!is.null(input$samples_upload) && !is.null(input$prediction_upload)) {
       samples <- tryCatch({
-        st_read(input$gpkg_file$datapath, quiet = TRUE)
+        st_read(input$samples_upload$datapath, quiet = TRUE)
       }, error = function(e) NULL)
       
       prediction_area <- tryCatch({
-        st_read(input$gpkg_file_2$datapath, quiet = TRUE)
+        st_read(input$prediction_upload$datapath, quiet = TRUE)
       }, error = function(e) NULL)
       
       if (!is.null(samples) && !is.null(prediction_area)) {
@@ -339,11 +424,30 @@ server <- function(input, output, session) {
   }
 
   
+  ## Render other stuff -----------
   render_suggestion = function(element_id, element_placeholder, suggestions){
     suggestions = sort(trimws(unlist(strsplit(suggestions, ","))))
     selectizeInput(inputId = element_id, label = element_placeholder, choices = suggestions, multiple = TRUE, options = list(create = T,  placeholder = "Choose from list or insert new values"))
   }
 
+  
+
+  render_suggestion_single = function(element_id, element_placeholder, suggestions){
+    suggestions = sort(trimws(unlist(strsplit(suggestions, ","))))
+    suggestions = suggestions[suggestions != ""]  # Remove blanks
+    
+    selectizeInput(
+      inputId = element_id,
+      label = element_placeholder,
+      choices = suggestions,
+      selected = character(0),  # Ensures nothing is selected -- doesnt work!!!
+      multiple = FALSE,
+      options = list(
+        create = TRUE,
+        placeholder = "Choose from list or insert new values"
+      )
+    )
+  }
   
   render_model_settings = function(){
     div(
@@ -354,8 +458,14 @@ server <- function(input, output, session) {
     )
   }
   
-  render_section = function(section, odmap_dict){
-    section_dict = filter(odmap_dict, section == !!section) 
+  render_section = function(section, subsection, odmap_dict){
+    
+    if(!is.null(subsection)) {
+      section_dict = filter(odmap_dict, section == !!section & .data$subsection %in% !!subsection) 
+    } else {
+      section_dict = filter(odmap_dict, section == !!section) 
+    }
+    
     section_rendered = renderUI({
       section_UI_list = vector("list", nrow(section_dict)) # holds UI elements for all ODMAP elements belonging to 'section'
       subsection = ""
@@ -382,16 +492,22 @@ server <- function(input, output, session) {
                                       n_classes = render_n_classes(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       n_samples_per_class = render_n_samples_class(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       
-                                      interpolation_range = render_range(section_dict$element_id[i], section_dict$element_placeholder[i]),
-                                      
+                                      interpolation_range = {
+                                        if (!is.null(model_type()) && model_type() == "Classification") {
+                                          NULL  # Hide interpolation_range for classification models
+                                        } else {
+                                          render_range(section_dict$element_id[i], section_dict$element_placeholder[i])
+                                        }},
+                                        
                                       hyperparams = render_hyperparameters(section_dict$element_id[i], section_dict$element_placeholder[i]),
-                                      
-                                      
+
                                       model_type = render_model_type(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       model_algorithm = render_model_algorithm(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       
                                       sampling_design = render_design(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      samples_crs = render_crs(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       
+                                      suggestion_single = render_suggestion_single(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
                                       suggestion = render_suggestion(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
                                       model_setting = render_model_settings())
         
@@ -408,6 +524,7 @@ server <- function(input, output, session) {
     })
     return(section_rendered)
   }
+  
   
   # ------------------------------------------------------------------------------------------#
   #                            Rendering functions for Markdown Output                        # 
@@ -596,11 +713,19 @@ server <- function(input, output, session) {
   #                                   UI Elements                                             # 
   # ------------------------------------------------------------------------------------------#
   # "Create a protocol" - mainPanel elements
-  output$Overview_UI = render_section("Overview", odmap_dict)
-  output$Model_UI = render_section("Model", odmap_dict)
-  output$Prediction_UI = render_section("Prediction", odmap_dict)
+  output$Overview_UI = render_section("Overview", NULL, odmap_dict)
+  output$Model_UI_response <- render_section("Model", "Response", odmap_dict)
+  output$Model_UI_predictor <- render_section("Model", "Predictors", odmap_dict)
+  output$Model_UI_algorithms <- render_section("Model", "Learning method", odmap_dict)
+  output$Model_UI_validation <- render_section("Model", c("Parameter uncertainty and biases", "Model validation and selection"), odmap_dict)
+  output$Model_UI_interpretation <- render_section("Model", "Model explainability", odmap_dict)
+  output$Model_UI_Software <- render_section("Model", "Software", odmap_dict)
   
-  for(tab in c("Overview_UI", "Model_UI", "Prediction_UI")){
+  output$Prediction_UI_area = render_section("Prediction", "Prediction domain", odmap_dict)
+  output$Prediction_UI_eval = render_section("Prediction", "Evaluation and Uncertainty", odmap_dict)
+  output$Prediction_UI_post = render_section("Prediction", "Post-Processing", odmap_dict)
+  
+  for(tab in c("Overview_UI", "Model_UI_response", "Model_UI_predictor", "Prediction_UI_area", "Prediction_UI_eval", "Prediction_UI_post")){
     outputOptions(output, tab, suspendWhenHidden = FALSE) # Add tab contents to output object before rendering
   } 
   
@@ -777,26 +902,32 @@ server <- function(input, output, session) {
   # -------------------------------------------
   # Warning message for inappropriate CV strategy
   observe({
-    if (isTruthy(input$sampling_design) && isTruthy(input$m_validation_1)) {
-      if (input$sampling_design == "clustered" && input$m_validation_1 == "Random Cross-Validation") {
-        showNotification("Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.", type = "warning")
+    if (isTruthy(input$sampling_design) && isTruthy(isolate(input$m_validation_1))) {
+      if (input$sampling_design == "clustered" && isolate(input$m_validation_1) == "Random Cross-Validation") {
+        showNotification(
+          "⚠️ Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.",
+          type = "warning", duration = 8
+        )
       }
     }
   })
-  
   
   observe({
-    if (isTruthy(input$sampling_design) && isTruthy(input$m_validation_1)) {
-      if (input$sampling_design == "random" && input$m_validation_1 == "Spatial Cross-Validation") {
-        showNotification("Warning: Spatial CV with randomly distributed samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.", type = "warning")
+    if (isTruthy(input$sampling_design) && isTruthy(isolate(input$m_validation_1))) {
+      if (input$sampling_design == "random" && isolate(input$m_validation_1) == "Spatial Cross-Validation") {
+        showNotification(
+          "⚠️ Warning: Spatial CV with randomly distributed samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.",
+          type = "warning"
+        )
       }
     }
   })
+  
   
   observe({
     if (isTruthy(input$sampling_design) && isTruthy(input$p_eval_3)) {
       if (input$sampling_design == "clustered" && input$p_eval_3 == "None") {
-        showNotification("Warning: Clustered samples often lead to extrapolation when the model is applied to feature combinations not present in the training data.
+        showNotification("⚠️ Warning: Clustered samples often lead to extrapolation when the model is applied to feature combinations not present in the training data.
                          Identifying areas of extrapolation/uncertainty and communicating them to the user of the prediction is recommended.", type = "warning")
       }
     }
@@ -806,7 +937,7 @@ server <- function(input, output, session) {
   observe({
     if (isTruthy(input$sampling_design) && isTruthy(input$d_predictors_1)) {
       if (input$sampling_design == "clustered" && "Spatial Proxies" %in% input$d_predictors_1) {
-        showNotification("Warning: Using spatial proxies with clustered samples likely leads to extrapolation situations.\nYou might
+        showNotification("⚠️ Warning: Using spatial proxies with clustered samples likely leads to extrapolation situations.\nYou might
                          consider using physically relevant predictors instead.", type = "warning")
       }
     }
@@ -973,10 +1104,10 @@ server <- function(input, output, session) {
   ## Upload gpkg --------------------
   # Reactive expression to read the .gpkg file
   uploaded_gpkg <- reactive({
-    req(input$gpkg_file)
+    req(input$samples_upload)
     
     tryCatch({
-      st_read(input$gpkg_file$datapath)
+      st_read(input$samples_upload$datapath)
     }, error = function(e) {
       showNotification("Failed to read .gpkg file.", type = "error")
       NULL
@@ -995,18 +1126,19 @@ server <- function(input, output, session) {
   
   # This controls conditionalPanel visibility
   output$showGpkgPlot <- reactive({
-    !is.null(input$gpkg_file)
+    !is.null(input$samples_upload) && samples_valid()
   })
+  outputOptions(output, "showGpkgPlot", suspendWhenHidden = FALSE)
   outputOptions(output, "showGpkgPlot", suspendWhenHidden = FALSE)
   
   
   
   ## Plot prediction area -------------------------
   uploaded_gpkg_2 <- reactive({
-    req(input$gpkg_file_2)
+    req(input$prediction_upload)
     
     tryCatch({
-      st_read(input$gpkg_file_2$datapath)
+      st_read(input$prediction_upload$datapath)
     }, error = function(e) {
       showNotification("Failed to read second .gpkg file.", type = "error")
       NULL
@@ -1024,7 +1156,7 @@ server <- function(input, output, session) {
   })
   
   output$showGpkgPlot2 <- reactive({
-    !is.null(input$gpkg_file_2)
+    !is.null(input$prediction_upload) && prediction_valid()
   })
   outputOptions(output, "showGpkgPlot2", suspendWhenHidden = FALSE)
   

@@ -3,6 +3,7 @@ library(shinyjs)
 library(shinyWidgets)
 library(shinythemes)
 library(shinydashboard)
+library(shinyBS)
 library(DT)
 
 
@@ -97,47 +98,52 @@ ui <-  tagList(
             uiOutput("Overview_UI")
           )),
           
-          tabPanel("2. Model", value = "Model", fluidPage(
-            
-            em(p("Describe your modeling approach in detail.", style = "padding-top: 10px; font-weight: 300")),
-            
-            # Upload model object
-            tags$hr(),
-            h4("Optional Upload of model data", style = "margin-top: 20px;"),
-            tags$hr(),
-            fileInput("model_upload", "Upload trained model (.RDS)", accept = ".rds"),
-            tags$hr(),
-            
-            
-            # Upload gpkg to generate plot of samples
-            tags$hr(),
-            h4("Optional Spatial Input (.gpkg)", style = "margin-top: 20px;"),
-            tags$hr(),
-            fileInput("gpkg_file", "Upload Sample locations (.gpkg)", accept = ".gpkg"),
-            
-            # Optional map output shown only if a file is uploaded
-            conditionalPanel(
-              condition = "output.showGpkgPlot == true",
-              plotOutput("d_response_7", height = "400px")
-            ),
-            
-            # Upload gpkg to generate plot of prediction area
-            fileInput("gpkg_file_2", "Upload Prediction area (.gpkg)", accept = ".gpkg"),
-            
-            conditionalPanel(
-              condition = "output.showGpkgPlot2 == true",
-              plotOutput("p_pred", height = "400px")
-            ),
-            tags$hr(),
-            
-            uiOutput("Model_UI"),
-            
-            
-          )),
+          tabPanel("2. Model",
+                   shiny::fluidPage(
+                     
+                     bsCollapse(
+                       bsCollapsePanel("Upload of model / spatial data", style = "primary",
+                                       fileInput("model_upload", "Upload model object (RDS)", accept = ".rds"),
+                                       fileInput("samples_upload", "Upload training data (GeoPackage)", accept = ".gpkg"),
+                                       # Optional map output shown only if a file is uploaded
+                                       conditionalPanel(
+                                         condition = "output.showGpkgPlot == true",
+                                         plotOutput("d_response_7", height = "400px")
+                                       ),
+                                       
+                                       # Upload gpkg to generate plot of prediction area
+                                       fileInput("prediction_upload", "Upload Prediction/Training area (.gpkg)", accept = ".gpkg"),
+                                       
+                                       conditionalPanel(
+                                         condition = "output.showGpkgPlot2 == true",
+                                         plotOutput("p_pred", height = "400px")
+                                       )),
+                       bsCollapsePanel("Predictor Variables", style = "primary",
+                                       uiOutput("Model_UI_predictor")),
+                       bsCollapsePanel("Response Variables", style = "primary",
+                                       uiOutput("Model_UI_response")),
+                       bsCollapsePanel("Learning method", style = "primary",
+                                       uiOutput("Model_UI_algorithms")),
+                       bsCollapsePanel("Model Validation", style = "primary",
+                                       uiOutput("Model_UI_validation")),
+                       bsCollapsePanel("Model interpretation", style = "primary",
+                                       uiOutput("Model_UI_interpretation")),
+                       bsCollapsePanel("Software", style = "primary",
+                                       uiOutput("Model_UI_Software"))
+                     
+                   
+                   ))),
           
-          tabPanel("3. Prediction", value = "Prediction", fluidPage(
-            em(p("Detail the models predictions.", style = "padding-top: 10px; font-weight: 300")),
-            uiOutput("Prediction_UI")
+          tabPanel("3. Prediction", fluidPage(
+            bsCollapse(
+              bsCollapsePanel("Prediction area", style = "primary",
+                              uiOutput("Prediction_UI_area")),
+              bsCollapsePanel("Evaluation and Uncertainty", style = "primary",
+                              uiOutput("Prediction_UI_eval")),
+              bsCollapsePanel("Post-Processing", style = "primary",
+                              uiOutput("Prediction_UI_post"))
+              
+            )
           ))
         ))
     )),
