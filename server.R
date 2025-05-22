@@ -285,7 +285,31 @@ server <- function(input, output, session) {
   samples_crs <- reactiveVal(NULL)
   auto_selected <- reactiveVal(NULL)
   samples_valid <- reactiveVal(TRUE)
+  trainArea_valid <- reactiveVal(TRUE)
   prediction_valid <- reactiveVal(TRUE)
+  
+  # check if training area is valid
+  observeEvent(input$prediction_upload, {
+    req(input$prediction_upload)
+    
+    trainArea_valid(TRUE)  # reset
+    auto_selected(NULL)
+    
+    trainArea <- tryCatch({
+      st_read(input$prediction_upload$datapath, quiet = TRUE)
+    }, error = function(e) {
+      showNotification("Could not read prediction area file.", type = "error")
+      return(NULL)
+    })
+    
+    if (!is.null(trainArea)) {
+      geom_type <- unique(st_geometry_type(trainArea))
+      if (!all(geom_type %in% c("POLYGON", "MULTIPOLYGON"))) {
+        showNotification("Prediction area must contain only POLYGON geometries.", type = "error")
+        trainArea_valid(FALSE)
+      }
+    }
+  })
   
   # check if prediction area is valid
   observeEvent(input$prediction_upload, {
@@ -1101,7 +1125,7 @@ server <- function(input, output, session) {
   
   
   ## Upload gpkg --------------------
-  # Reactive expression to read the .gpkg file
+  ## Plot sampling locations -------------------------
   uploaded_gpkg <- reactive({
     req(input$samples_upload)
     
@@ -1112,7 +1136,7 @@ server <- function(input, output, session) {
       NULL
     })
   })
-  
+
   output$d_response_7 <- renderPlot({
     gpkg_data <- uploaded_gpkg()
     req(gpkg_data)
@@ -1129,7 +1153,32 @@ server <- function(input, output, session) {
   })
   outputOptions(output, "showGpkgPlot", suspendWhenHidden = FALSE)
   
+  ## Plot sampling area -------------------------
+  uploaded_gpkg_3 <- reactive({
+    req(input$trainArea_upload)
+    
+    tryCatch({
+      st_read(input$trainArea_upload$datapath)
+    }, error = function(e) {
+      showNotification("Failed to read second .gpkg file.", type = "error")
+      NULL    })
+  })
   
+  output$m_algorithms_5 <- renderPlot({
+    gpkg_data3 <- uploaded_gpkg_3()
+    req(gpkg_data3)
+    
+    ggplot(gpkg_data3) +
+      geom_sf() +
+      ggtitle("Training/Prediction area") +
+      theme_minimal()
+  })
+  
+  # This controls conditionalPanel visibility
+  output$showGpkgPlot3 <- reactive({
+    !is.null(input$trainArea_upload) && trainArea_valid()
+  })
+  outputOptions(output, "showGpkgPlot3", suspendWhenHidden = FALSE)
   
   ## Plot prediction area -------------------------
   uploaded_gpkg_2 <- reactive({
@@ -1161,6 +1210,27 @@ server <- function(input, output, session) {
   })
   outputOptions(output, "showGpkgPlot2", suspendWhenHidden = FALSE)
   
+  
+  # show geodist plot if both prediction area and samples are uploaded
+  output$geodist <- renderPlot({
+    samples <- uploaded_gpkg()
+    prediction_area <- uploaded_gpkg_2()
+    req(samples, prediction_area)
+    
+    sf::st_crs(samples) <- sf::st_crs(prediction_area)
+    plot(CAST::geodist(samples, prediction_area)) + 
+      ggplot2::ggtitle("Density distribution of Nearest-Neighbour Distances") +
+      ggplot2::theme(aspect.ratio=0.5)
+  })
+  
+  output$showGeodist <- renderText({
+    if (isTruthy(input$prediction_upload) && prediction_valid() && isTruthy(input$samples_upload) && samples_valid()) {
+      "true"
+    } else {
+      "false"
+    }
+  })
+  outputOptions(output, "showGeodist", suspendWhenHidden = FALSE)
   
   
 }

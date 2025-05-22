@@ -102,25 +102,26 @@ ui <-  tagList(
                    shiny::fluidPage(
                      
                      bsCollapse(
-                       bsCollapsePanel("Upload of model / spatial data", style = "primary",
-                                       fileInput("model_upload", "Upload model object (RDS)", accept = ".rds"),
-                                       fileInput("samples_upload", "Upload training data (GeoPackage)", accept = ".gpkg"),
-                                       fileInput("prediction_upload", "Upload Prediction/Training area (.gpkg)", accept = ".gpkg")),
+                       bsCollapsePanel("Upload of model", style = "primary",
+                                       fileInput("model_upload", "Upload model object (RDS)", accept = ".rds")),
                        bsCollapsePanel("Predictor Variables", style = "primary",
                                        uiOutput("Model_UI_predictor")),
                        bsCollapsePanel("Response Variables", style = "primary",
-                                       uiOutput("Model_UI_response"),
+                                       fileInput("samples_upload", "Upload training data (GeoPackage)", accept = ".gpkg"),
                                        # Optional map output shown only if a file is uploaded
                                        conditionalPanel(
                                          condition = "output.showGpkgPlot == true",
                                          plotOutput("d_response_7", height = "400px")
-                                       )),
+                                       ),
+                                       uiOutput("Model_UI_response")),
                        bsCollapsePanel("Learning method", style = "primary",
-                                       uiOutput("Model_UI_algorithms"),
+                                       fileInput("trainArea_upload", "Upload training area (GeoPackage)", accept = ".gpkg"),
+                                       # Optional map output shown only if a file is uploaded
                                        conditionalPanel(
-                                         condition = "output.showGpkgPlot2 == 'true'",
-                                         plotOutput("p_pred", height = "400px")
-                                       )),
+                                         condition = "showGpkgPlot3 == true",
+                                         plotOutput("m_algorithms_5", height = "400px")
+                                       ),
+                                       uiOutput("Model_UI_algorithms")),
                        bsCollapsePanel("Model Validation", style = "primary",
                                        uiOutput("Model_UI_validation")),
                        bsCollapsePanel("Model interpretation", style = "primary",
@@ -134,6 +135,15 @@ ui <-  tagList(
           tabPanel("3. Prediction", fluidPage(
             bsCollapse(
               bsCollapsePanel("Prediction domain", style = "primary",
+                              fileInput("prediction_upload", "Upload prediction area (.gpkg)", accept = ".gpkg"),
+                              conditionalPanel(
+                                condition = "output.showGeodist == 'true'",
+                                plotOutput("geodist", height = "200px")
+                              ),
+                              conditionalPanel(
+                                condition = "output.showGpkgPlot2 == 'true'",
+                                plotOutput("p_pred", height = "400px")
+                              ),
                               uiOutput("Prediction_UI_area")),
               bsCollapsePanel("Evaluation and Uncertainty", style = "primary",
                               uiOutput("Prediction_UI_eval")),
