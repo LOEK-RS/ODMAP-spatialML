@@ -105,25 +105,22 @@ ui <-  tagList(
                        bsCollapsePanel("Upload of model / spatial data", style = "primary",
                                        fileInput("model_upload", "Upload model object (RDS)", accept = ".rds"),
                                        fileInput("samples_upload", "Upload training data (GeoPackage)", accept = ".gpkg"),
+                                       fileInput("prediction_upload", "Upload Prediction/Training area (.gpkg)", accept = ".gpkg")),
+                       bsCollapsePanel("Predictor Variables", style = "primary",
+                                       uiOutput("Model_UI_predictor")),
+                       bsCollapsePanel("Response Variables", style = "primary",
+                                       uiOutput("Model_UI_response"),
                                        # Optional map output shown only if a file is uploaded
                                        conditionalPanel(
                                          condition = "output.showGpkgPlot == true",
                                          plotOutput("d_response_7", height = "400px")
-                                       ),
-                                       
-                                       # Upload gpkg to generate plot of prediction area
-                                       fileInput("prediction_upload", "Upload Prediction/Training area (.gpkg)", accept = ".gpkg"),
-                                       
+                                       )),
+                       bsCollapsePanel("Learning method", style = "primary",
+                                       uiOutput("Model_UI_algorithms"),
                                        conditionalPanel(
-                                         condition = "output.showGpkgPlot2 == true",
+                                         condition = "output.showGpkgPlot2 == 'true'",
                                          plotOutput("p_pred", height = "400px")
                                        )),
-                       bsCollapsePanel("Predictor Variables", style = "primary",
-                                       uiOutput("Model_UI_predictor")),
-                       bsCollapsePanel("Response Variables", style = "primary",
-                                       uiOutput("Model_UI_response")),
-                       bsCollapsePanel("Learning method", style = "primary",
-                                       uiOutput("Model_UI_algorithms")),
                        bsCollapsePanel("Model Validation", style = "primary",
                                        uiOutput("Model_UI_validation")),
                        bsCollapsePanel("Model interpretation", style = "primary",
@@ -136,7 +133,7 @@ ui <-  tagList(
           
           tabPanel("3. Prediction", fluidPage(
             bsCollapse(
-              bsCollapsePanel("Prediction area", style = "primary",
+              bsCollapsePanel("Prediction domain", style = "primary",
                               uiOutput("Prediction_UI_area")),
               bsCollapsePanel("Evaluation and Uncertainty", style = "primary",
                               uiOutput("Prediction_UI_eval")),

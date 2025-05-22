@@ -902,45 +902,44 @@ server <- function(input, output, session) {
   # -------------------------------------------
   # Warning message for inappropriate CV strategy
   observe({
-    if (isTruthy(input$sampling_design) && isTruthy(isolate(input$m_validation_1))) {
-      if (input$sampling_design == "clustered" && isolate(input$m_validation_1) == "Random Cross-Validation") {
-        showNotification(
-          "⚠️ Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.",
-          type = "warning", duration = 8
-        )
-      }
+    req(input$sampling_design, input$m_validation_1)
+    
+    if (input$sampling_design == "clustered" && input$m_validation_1 == "Random Cross-Validation") {
+      showNotification(
+        "⚠️ Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.",
+        type = "warning", duration = 8
+      )
     }
   })
   
   observe({
-    if (isTruthy(input$sampling_design) && isTruthy(isolate(input$m_validation_1))) {
-      if (input$sampling_design == "random" && isolate(input$m_validation_1) == "Spatial Cross-Validation") {
-        showNotification(
-          "⚠️ Warning: Spatial CV with randomly distributed samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.",
-          type = "warning"
-        )
-      }
+    req(input$sampling_design, input$m_validation_1)
+    
+    if (input$sampling_design == "random" && input$m_validation_1 == "Spatial Cross-Validation") {
+      showNotification(
+        "⚠️ Warning: Spatial CV with random samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.",
+        type = "warning", duration = 8
+      )
     }
   })
   
   
   observe({
-    if (isTruthy(input$sampling_design) && isTruthy(input$p_eval_3)) {
-      if (input$sampling_design == "clustered" && input$p_eval_3 == "None") {
-        showNotification("⚠️ Warning: Clustered samples often lead to extrapolation when the model is applied to feature combinations not present in the training data.
+    req(input$sampling_design, input$p_eval_3)
+    if (input$sampling_design == "clustered" && input$p_eval_3 == "None") {
+      showNotification("⚠️ Warning: Clustered samples often lead to extrapolation when the model is applied to feature combinations not present in the training data.
                          Identifying areas of extrapolation/uncertainty and communicating them to the user of the prediction is recommended.", type = "warning")
-      }
     }
+    
   })
   
   
   observe({
-    if (isTruthy(input$sampling_design) && isTruthy(input$d_predictors_1)) {
-      if (input$sampling_design == "clustered" && "Spatial Proxies" %in% input$d_predictors_1) {
+    req(input$sampling_design, input$d_predictors_1)
+    if (input$sampling_design == "clustered" && "Spatial Proxies" %in% input$d_predictors_1) {
         showNotification("⚠️ Warning: Using spatial proxies with clustered samples likely leads to extrapolation situations.\nYou might
                          consider using physically relevant predictors instead.", type = "warning")
       }
-    }
   })
   
   
@@ -951,7 +950,7 @@ server <- function(input, output, session) {
   observeEvent(input$hide_optional,{
     if(is.null(input$o_objective_1)){
       return(NULL)
-    } else if(input$hide_optional == T & input$o_objective_1 == ""){+
+    } else if(input$hide_optional == T & input$o_objective_1 == ""){
       showNotification("Please select a model objective under '1. Overview'", duration = 3, type = "message")
       Sys.sleep(0.3)
       updateMaterialSwitch(session, "hide_optional", value = F)
@@ -1120,7 +1119,7 @@ server <- function(input, output, session) {
     
     ggplot(gpkg_data) +
       geom_sf() +
-      ggtitle("Uploaded GeoPackage Data") +
+      ggtitle("Sampling locations") +
       theme_minimal()
   })
   
@@ -1128,7 +1127,6 @@ server <- function(input, output, session) {
   output$showGpkgPlot <- reactive({
     !is.null(input$samples_upload) && samples_valid()
   })
-  outputOptions(output, "showGpkgPlot", suspendWhenHidden = FALSE)
   outputOptions(output, "showGpkgPlot", suspendWhenHidden = FALSE)
   
   
@@ -1141,8 +1139,7 @@ server <- function(input, output, session) {
       st_read(input$prediction_upload$datapath)
     }, error = function(e) {
       showNotification("Failed to read second .gpkg file.", type = "error")
-      NULL
-    })
+      NULL    })
   })
   
   output$p_pred <- renderPlot({
@@ -1151,14 +1148,19 @@ server <- function(input, output, session) {
     
     ggplot(gpkg_data2) +
       geom_sf() +
-      ggtitle("Second GeoPackage Data") +
+      ggtitle("Training/Prediction area") +
       theme_minimal()
   })
   
-  output$showGpkgPlot2 <- reactive({
-    !is.null(input$prediction_upload) && prediction_valid()
+  output$showGpkgPlot2 <- renderText({
+    if (isTruthy(input$prediction_upload) && prediction_valid()) {
+      "true"
+    } else {
+      "false"
+    }
   })
   outputOptions(output, "showGpkgPlot2", suspendWhenHidden = FALSE)
+  
   
   
 }
