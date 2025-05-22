@@ -6,6 +6,13 @@ library(shinydashboard)
 library(DT)
 library(tidyverse)
 library(rangeModelMetadata)
+library(sf)
+library(ggplot2)
+library(CAST)
+library(parsnip)
+library(workflows)
+library(mlr3)
+
 
 odmap_dict = read.csv("www/odmap_dict.csv", header = T, stringsAsFactors = F)
 rmm_dict = rmmDataDictionary()
@@ -31,13 +38,439 @@ server <- function(input, output, session) {
                    choices = list("", "Inference and explanation", "Mapping and interpolation"))
   }
   
+  
+  ##### Infer information from model objects---------------
+  # Initialize reactive values to store the training sample count etc. 
+  num_training_samples <- reactiveVal(NULL)
+  num_predictors <- reactiveVal(NULL)
+  names_predictors <- reactiveVal(NULL)
+  model_algorithm <- reactiveVal(NULL)
+  model_type <- reactiveVal(NULL)
+  model_hyperparams <- reactiveVal(NULL)
+  num_classes <- reactiveVal(NULL)
+  num_samples_per_class <- reactiveVal(NULL)
+  interpolation_range <- reactiveVal(NULL)
+  
+  # When caret model is uploaded, read it and extract training set size
+  observeEvent(input$model_upload, {
+    
+    req(input$model_upload)
+    
+    # Reset reactive values if new model object is uploaded
+    model_type(NULL)
+    model_algorithm(NULL)
+    model_hyperparams(NULL)
+    num_predictors(NULL)
+    names_predictors(NULL)
+    num_training_samples(NULL)
+    num_classes(NULL)
+    num_samples_per_class(NULL)
+    interpolation_range(NULL)
+    
+    
+    # read model --------
+    model <- tryCatch({
+      readRDS(input$model_upload$datapath)
+    }, error = function(e) {
+      showNotification("Invalid RDS file or failed to load model.", type = "error")
+      return(NULL)
+    })
+
+    # --------------------------------------
+    # Caret model
+    # --------------------------------------
+    if ("train" %in% class(model)) {
+      if (!is.null(model$trainingData)) {
+        num_training_samples(nrow(model$trainingData))
+        num_predictors(ncol(model$trainingData) - 1)
+        names_predictors(paste(names(model$trainingData[, -1]), collapse = ", "))
+      }
+      
+      if (!is.null(model$bestTune)) {
+        model_hyperparams(paste0(names(model$bestTune), "=", model$bestTune, collapse = ","))
+      }
+      
+      model_algorithm(model$method)
+      
+      if (!is.null(model$modelType)) {
+        model_type(model$modelType)
+      } else {
+        response <- model$trainingData[, 1]
+        model_type(if (is.factor(response)) "Classification" else "Regression")
+      }
+      
+      if (model_type() == "Classification") {
+        num_classes(length(unique(model$trainingData$.outcome)))
+        num_samples_per_class(paste0(names(table(model$trainingData$.outcome)), ": ", table(model$trainingData$.outcome), collapse = ", "))
+      } else {
+        interpolation_range(paste(round(range(model$trainingData$.outcome), 3), collapse = " to "))
+      }
+      
+      # --------------------------------------
+      # Tidymodels (workflows, parsnip fits)
+      # --------------------------------------
+    } else if ("workflow" %in% class(model) || "model_fit" %in% class(model)) {
+      fit <- if ("workflow" %in% class(model)) extract_fit_parsnip(model) else model
+      data <- tryCatch(extract_mold(model), error = function(e) NULL)
+      
+      if (!is.null(fit)) {
+        model_algorithm(fit$spec$engine)
+        model_type(fit$spec$mode)
+        
+        if (!is.null(fit$spec$args)) {
+          model_hyperparams(paste0(names(fit$spec$args), "=", unlist(fit$spec$args), collapse = ","))
+        }
+      }
+      
+      if (!is.null(data)) {
+        num_training_samples(nrow(data$outcomes))
+        num_predictors(ncol(data$predictors))
+        names_predictors(paste(names(data$predictors), collapse = ", "))
+        if (is.factor(data$outcomes[[1]])) {
+          num_classes(length(unique(data$outcomes[[1]])))
+          num_samples_per_class(paste0(names(table(data$outcomes[[1]])), ": ", table(data$outcomes[[1]]), collapse = ", "))
+        } else {
+          interpolation_range(paste(round(range(data[[1]]), 3), collapse = " to "))
+        }
+      }
+      # --------------------------------------
+      # mlr3 models
+      # --------------------------------------
+    } else if ("Learner" %in% class(model) || "GraphLearner" %in% class(model)) {
+      if (!is.null(model$predict_type)) {
+        model_type(if (grepl("classif", model$id)) "Classification" else "Regression")
+      }
+      
+      model_algorithm(model$label)
+      
+      if (!is.null(model$param_set$values)) {
+        model_hyperparams(paste0(names(model$param_set$values), "=", unlist(model$param_set$values), collapse = ","))
+      }
+      
+      if (!is.null(model$training_data)) {
+        target <- model$training_data[[model$task$target_names]]
+        num_training_samples(nrow(model$training_data))
+        num_predictors(ncol(model$training_data) - 1)
+        names_predictors(paste(setdiff(names(model$training_data), model$task$target_names), collapse = ", "))
+        
+        if (is.factor(target)) {
+          num_classes(length(unique(target)))
+          num_samples_per_class(paste0(names(table(target)), ": ", table(target), collapse = ", "))
+        } else {
+          interpolation_range(paste(round(range(target), 3), collapse = " to "))
+        }
+      } else {
+        
+        num_training_samples(model$model$num.samples)
+        num_predictors(length(model$model$forest$independent.variable.names))
+        names_predictors(paste(model$model$forest$independent.variable.names, collapse = ", "))
+        
+        if (isTRUE(grepl("classif", model$id))) {
+          num_classes(length(model$model$forest$levels))
+        } 
+        
+      }
+    } else {
+      showNotification("Unsupported model type uploaded. Supported: caret, tidymodels, mlr3.", type = "error")
+    }
+    
+  })
+  
+  # Render UI for extracted model information
+  render_n_samples = function(element_id, element_placeholder) {
+      if (!is.null(num_training_samples())) {
+        tagList(
+          numericInput("d_response_3", "Number of Training Samples", value = num_training_samples()),
+        )
+      } else {
+        numericInput("d_response_3", "Number of Training Samples", value = NULL)
+      }
+  }
+  
+  render_n_predictors = function(element_id, element_placeholder) {
+    if (!is.null(num_predictors())) {
+      tagList(
+        numericInput("d_predictors_2", "Number of Predictors", value = num_predictors()),
+      )
+    } else {
+      numericInput("d_predictors_2", "Number of Predictors", value = NULL)
+    }
+  }
+  
+  render_n_classes = function(element_id, element_placeholder) {
+    if (!is.null(num_classes())) {
+      tagList(
+        numericInput("d_response_4", "Number of Classes", value = num_classes()),
+      )
+    } else {
+      numericInput("d_response_4", "Number of Classes", value = NULL)
+    }
+  }
+  
+  render_n_samples_class = function(element_id, element_placeholder) {
+    if (!is.null(num_samples_per_class())) {
+      tagList(
+        textInput("d_response_5", "Number of Samples per Class", value = num_samples_per_class()),
+      )
+    } else {
+      textInput("d_response_5", "Number of Samples per Class", value = NULL)
+    }
+  }
+  
+  render_range = function(element_id, element_placeholder) {
+    if (!is.null(interpolation_range())) {
+      tagList(
+        textInput("d_response_6", "Response range", value = interpolation_range()),
+      )
+    } else {
+      textInput("d_response_6", "Response range", value = NULL)
+    }
+  }
+  
+  render_names_predictors = function(element_id, element_placeholder) {
+    if (!is.null(names_predictors())) {
+      tagList(
+        textInput("d_predictors_3", "Names of Predictors", value = names_predictors()),
+      )
+    } else {
+      textInput("d_predictors_3", "Names of Predictors", value = NULL)
+    }
+  } 
+  
+  render_hyperparameters = function(element_id, element_placeholder) {
+    if (!is.null(model_hyperparams())) {
+      tagList(
+        textInput("m_validation_3", "Hyperparameter values", value = model_hyperparams()),
+      )
+    } else {
+      textInput("m_validation_3", "Hyperparameter values", value = NULL)
+    }
+  } 
+  
+  render_model_type = function(element_id, element_placeholder) {
+    selectInput("m_algorithms_1", "Model Type",
+                choices = c("", "Classification", "Regression"),
+                selected = model_type())
+    
+  }
+  
+  render_model_algorithm = function(element_id, element_placeholder) {
+    # Default list of known algorithms
+    default_algos <- c("rf", "gbm", "glm", "svmRadial", "nnet", "rpart")
+    selected_algo <- model_algorithm()
+    
+    # Ensure the selected algorithm is in the choices
+    algo_choices <- if (!is.null(selected_algo) && !(selected_algo %in% default_algos)) {
+      c(default_algos, selected_algo)
+    } else {
+      default_algos
+    }
+    
+    selectInput(
+        "m_algorithms_2", "Algorithm",
+        choices = c("", unique(algo_choices)),
+        selected = selected_algo
+      )
+    
+  }
+  
+  observeEvent(model_type(), {
+    if (!is.null(model_type()) && !is.null(model_algorithm()) && !is.null(num_training_samples())) {
+      showNotification("Model details filled from uploaded .RDS", type = "message")
+    }
+  })
+  
+  
+  ## Extract information from uploaded spatial objects ----------
+  samples_crs <- reactiveVal(NULL)
+  auto_selected <- reactiveVal(NULL)
+  samples_valid <- reactiveVal(TRUE)
+  trainArea_valid <- reactiveVal(TRUE)
+  prediction_valid <- reactiveVal(TRUE)
+  
+  # check if training area is valid
+  observeEvent(input$trainArea_upload, {
+    req(input$trainArea_upload)
+    
+    trainArea_valid(TRUE)  # reset
+    auto_selected(NULL)
+    
+    trainArea <- tryCatch({
+      st_read(input$trainArea_upload$datapath, quiet = TRUE)
+    }, error = function(e) {
+      showNotification("Could not read prediction area file.", type = "error")
+      return(NULL)
+    })
+    
+    if (!is.null(trainArea)) {
+      geom_type <- unique(st_geometry_type(trainArea))
+      if (!all(geom_type %in% c("POLYGON", "MULTIPOLYGON"))) {
+        showNotification("Prediction area must contain only POLYGON geometries.", type = "error")
+        trainArea_valid(FALSE)
+      }
+    }
+  })
+  
+  # check if prediction area is valid
+  observeEvent(input$prediction_upload, {
+    req(input$prediction_upload)
+    
+    prediction_valid(TRUE)  # reset
+    auto_selected(NULL)
+    
+    prediction_area <- tryCatch({
+      st_read(input$prediction_upload$datapath, quiet = TRUE)
+    }, error = function(e) {
+      showNotification("Could not read prediction area file.", type = "error")
+      return(NULL)
+    })
+    
+    if (!is.null(prediction_area)) {
+      geom_type <- unique(st_geometry_type(prediction_area))
+      if (!all(geom_type %in% c("POLYGON", "MULTIPOLYGON"))) {
+        showNotification("Prediction area must contain only POLYGON geometries.", type = "error")
+        prediction_valid(FALSE)
+      }
+    }
+  })
+  
+  # check if samples are valid
+  observeEvent(input$samples_upload, {
+    req(input$samples_upload)
+    
+    samples_valid(TRUE)  # reset
+    auto_selected(NULL)
+    
+    samples <- tryCatch({
+      st_read(input$samples_upload$datapath, quiet = TRUE)
+    }, error = function(e) {
+      showNotification("Could not read samples file.", type = "error")
+      return(NULL)
+    })
+    
+    if (!is.null(samples)) {
+      geom_type <- unique(st_geometry_type(samples))
+      if (!all(geom_type %in% c("POINT", "MULTIPOINT"))) {
+        showNotification("Samples file must contain only POINT geometries.", type = "error")
+        samples_valid(FALSE)
+      }
+    }
+  })
+  
+  # When samples are uploaded, extract epsg string
+  observeEvent(input$samples_upload, {
+    
+    req(samples_valid())
+    req(input$samples_upload)
+    
+    # Reset reactive values if new model object is uploaded
+    samples_crs(NULL)
+    
+    # read data --------
+    samples <- tryCatch({
+      st_read(input$samples_upload$datapath)
+    }, error = function(e) {
+      showNotification("Invalid .gpkg file or failed to load model.", type = "error")
+      return(NULL)
+    })
+    
+    # Check if samples are a POINT geometry
+    samples_crs(st_crs(samples)$epsg)
+      
+  })
+  
+  
+  render_crs = function(element_id, element_placeholder) {
+    textInput(
+      inputId = element_id,
+      label = "Coordinate Reference System (epsg)",
+      value = samples_crs()  # NULL if unset
+    )
+  } 
+  
+  render_design = function(element_id, element_placeholder){
+    
+    req(samples_valid(), prediction_valid())
+    
+    auto_val <- NULL
+    
+    if (!is.null(input$samples_upload) && !is.null(input$prediction_upload)) {
+      samples <- tryCatch({
+        st_read(input$samples_upload$datapath, quiet = TRUE)
+      }, error = function(e) NULL)
+      
+      prediction_area <- tryCatch({
+        st_read(input$prediction_upload$datapath, quiet = TRUE)
+      }, error = function(e) NULL)
+      
+      if (!is.null(samples) && !is.null(prediction_area)) {
+        
+        samples <- st_transform(samples, st_crs(prediction_area))
+        
+        # sampling design
+        geod <- CAST::geodist(samples, modeldomain = prediction_area)
+
+        Gj <- geod[geod$what == "sample-to-sample",]$dist
+        Gij <- geod[geod$what == "prediction-to-sample",]$dist
+        
+        testks <- suppressWarnings(stats::ks.test(Gj, Gij, alternative = "great"))
+        
+        if(testks$p.value >= 0.05) {
+          auto_val <- "random"
+          auto_selected("random")
+        } else {
+          auto_val <- "clustered"
+          auto_selected("clustered")
+        }
+        
+      }
+    }
+    
+    observe({
+      if (!is.null(auto_selected())) {
+        showNotification(paste("Sampling design was automatically set to:", auto_selected()),
+                         type = "message", duration = 5)
+      }
+    })
+    
+    # Create dropdown menu
+    if (is.null(auto_val)) {
+      # No preselection
+      selectInput("sampling_design", "Sampling Design",
+                  choices = c("", "clustered", "random", "stratified"),
+                  selected = "")
+    } else {
+      # Preselect inferred value
+      selectInput("sampling_design", "Sampling Design",
+                  choices = c("clustered", "random", "stratified"),
+                  selected = auto_val)
+    }
+  }
+
+  
+  ## Render other stuff -----------
   render_suggestion = function(element_id, element_placeholder, suggestions){
     suggestions = sort(trimws(unlist(strsplit(suggestions, ","))))
     selectizeInput(inputId = element_id, label = element_placeholder, choices = suggestions, multiple = TRUE, options = list(create = T,  placeholder = "Choose from list or insert new values"))
   }
+
   
-  render_model_algorithm = function(element_id, element_placeholder){
-    selectizeInput(inputId = element_id, label = element_placeholder, choices = model_settings$suggestions, multiple = TRUE, options = list(create = T,  placeholder = "Choose from list or insert new values"))
+
+  render_suggestion_single = function(element_id, element_placeholder, suggestions){
+    suggestions = sort(trimws(unlist(strsplit(suggestions, ","))))
+    suggestions = suggestions[suggestions != ""]  # Remove blanks
+    
+    selectizeInput(
+      inputId = element_id,
+      label = element_placeholder,
+      choices = suggestions,
+      selected = character(0),  # Ensures nothing is selected -- doesnt work!!!
+      multiple = FALSE,
+      options = list(
+        create = TRUE,
+        placeholder = "Choose from list or insert new values"
+      )
+    )
   }
   
   render_model_settings = function(){
@@ -49,8 +482,14 @@ server <- function(input, output, session) {
     )
   }
   
-  render_section = function(section, odmap_dict){
-    section_dict = filter(odmap_dict, section == !!section) 
+  render_section = function(section, subsection, odmap_dict){
+    
+    if(!is.null(subsection)) {
+      section_dict = filter(odmap_dict, section == !!section & .data$subsection %in% !!subsection) 
+    } else {
+      section_dict = filter(odmap_dict, section == !!section) 
+    }
+    
     section_rendered = renderUI({
       section_UI_list = vector("list", nrow(section_dict)) # holds UI elements for all ODMAP elements belonging to 'section'
       subsection = ""
@@ -69,8 +508,31 @@ server <- function(input, output, session) {
                                       text = render_text(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       author = render_authors(),
                                       objective = render_objective(section_dict$element_id[i], section_dict$element_placeholder[i]),
-                                      suggestion = render_suggestion(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
+                                      
+                                      sample_size = render_n_samples(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      n_predictors = render_n_predictors(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      names_predictors = render_names_predictors(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      n_classes = render_n_classes(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      n_samples_per_class = render_n_samples_class(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      interpolation_range = {
+                                        if (!is.null(model_type()) && model_type() == "Classification") {
+                                          NULL  # Hide interpolation_range for classification models
+                                        } else {
+                                          render_range(section_dict$element_id[i], section_dict$element_placeholder[i])
+                                        }},
+                                        
+                                      hyperparams = render_hyperparameters(section_dict$element_id[i], section_dict$element_placeholder[i]),
+
+                                      model_type = render_model_type(section_dict$element_id[i], section_dict$element_placeholder[i]),
                                       model_algorithm = render_model_algorithm(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      sampling_design = render_design(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      samples_crs = render_crs(section_dict$element_id[i], section_dict$element_placeholder[i]),
+                                      
+                                      suggestion_single = render_suggestion_single(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
+                                      suggestion = render_suggestion(section_dict$element_id[i], section_dict$element_placeholder[i], section_dict$suggestions[i]),
                                       model_setting = render_model_settings())
         
         # Third element: Next/previous button
@@ -86,6 +548,7 @@ server <- function(input, output, session) {
     })
     return(section_rendered)
   }
+  
   
   # ------------------------------------------------------------------------------------------#
   #                            Rendering functions for Markdown Output                        # 
@@ -274,11 +737,19 @@ server <- function(input, output, session) {
   #                                   UI Elements                                             # 
   # ------------------------------------------------------------------------------------------#
   # "Create a protocol" - mainPanel elements
-  output$Overview_UI = render_section("Overview", odmap_dict)
-  output$Model_UI = render_section("Model", odmap_dict)
-  output$Prediction_UI = render_section("Prediction", odmap_dict)
+  output$Overview_UI = render_section("Overview", NULL, odmap_dict)
+  output$Model_UI_response <- render_section("Model", "Response", odmap_dict)
+  output$Model_UI_predictor <- render_section("Model", "Predictors", odmap_dict)
+  output$Model_UI_algorithms <- render_section("Model", "Learning method", odmap_dict)
+  output$Model_UI_validation <- render_section("Model", c("Parameter uncertainty and biases", "Model validation and selection"), odmap_dict)
+  output$Model_UI_interpretation <- render_section("Model", "Model explainability", odmap_dict)
+  output$Model_UI_Software <- render_section("Model", "Software", odmap_dict)
   
-  for(tab in c("Overview_UI", "Model_UI", "Prediction_UI")){
+  output$Prediction_UI_area = render_section("Prediction", "Prediction domain", odmap_dict)
+  output$Prediction_UI_eval = render_section("Prediction", "Evaluation and Uncertainty", odmap_dict)
+  output$Prediction_UI_post = render_section("Prediction", "Post-Processing", odmap_dict)
+  
+  for(tab in c("Overview_UI", "Model_UI_response", "Model_UI_predictor", "Prediction_UI_area", "Prediction_UI_eval", "Prediction_UI_post")){
     outputOptions(output, tab, suspendWhenHidden = FALSE) # Add tab contents to output object before rendering
   } 
   
@@ -452,35 +923,50 @@ server <- function(input, output, session) {
   })
   
   
-  
   # -------------------------------------------
   # Warning message for inappropriate CV strategy
   observe({
-    if (isTruthy(input$d_response_8) && isTruthy(input$m_validation_1)) {
-      if (input$d_response_8 == "clustered" && input$m_validation_1 == "Random Cross-Validation") {
-        showNotification("Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.", type = "warning")
-      }
+    req(input$sampling_design, input$m_validation_1)
+    
+    if (input$sampling_design == "clustered" && input$m_validation_1 == "Random Cross-Validation") {
+      showNotification(
+        "⚠️ Warning: Random CV with clustered samples likely results in unreliable error estimates. Use a spatial/target-oriented CV instead.",
+        type = "warning", duration = 8
+      )
+    }
+  })
+  
+  observe({
+    req(input$sampling_design, input$m_validation_1)
+    
+    if (input$sampling_design == "random" && input$m_validation_1 == "Spatial Cross-Validation") {
+      showNotification(
+        "⚠️ Warning: Spatial CV with random samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.",
+        type = "warning", duration = 8
+      )
     }
   })
   
   
   observe({
-    if (isTruthy(input$d_response_8) && isTruthy(input$m_validation_1)) {
-      if (input$d_response_8 == "random" && input$m_validation_1 == "Spatial Cross-Validation") {
-        showNotification("Warning: Spatial CV with randomly distributed samples likely results in unreliable error estimates. Use a random/target-oriented CV instead.", type = "warning")
-      }
+    req(input$sampling_design, input$p_eval_3)
+    if (input$sampling_design == "clustered" && input$p_eval_3 == "None") {
+      showNotification("⚠️ Warning: Clustered samples often lead to extrapolation when the model is applied to feature combinations not present in the training data.
+                         Identifying areas of extrapolation/uncertainty and communicating them to the user of the prediction is recommended.", type = "warning")
     }
+    
   })
   
   
   observe({
-    if (isTruthy(input$d_response_8) && isTruthy(input$p_eval_3)) {
-      if (input$d_response_8 == "random" && input$p_eval_3 == "None") {
-        showNotification("Warning: Many ML models are prone to extrapolation. It is strongly recommended\nto 
-                         delineate areas of extrapolation, and to communicate them as uncertain areas to the user of the prediction.", type = "warning")
+    req(input$sampling_design, input$d_predictors_1)
+    if (input$sampling_design == "clustered" && "Spatial Proxies" %in% input$d_predictors_1) {
+        showNotification("⚠️ Warning: Using spatial proxies with clustered samples likely leads to extrapolation situations.\nYou might
+                         consider using physically relevant predictors instead.", type = "warning")
       }
-    }
   })
+  
+  
   
   
   # -------------------------------------------
@@ -636,5 +1122,115 @@ server <- function(input, output, session) {
     updateNavbarPage(session, "navbar", selected = "create")
     updateTabsetPanel(session, "Tabset", selected = "Overview")
   })
+  
+  
+  ## Upload gpkg --------------------
+  ## Plot sampling locations -------------------------
+  uploaded_samplingLocations <- reactive({
+    req(input$samples_upload)
+    
+    tryCatch({
+      st_read(input$samples_upload$datapath)
+    }, error = function(e) {
+      showNotification("Failed to read the sampling location .gpkg file.", type = "error")
+      NULL
+    })
+  })
+
+  output$d_response_7 <- renderPlot({
+    sampling_locations <- uploaded_samplingLocations()
+    req(sampling_locations)
+    
+    ggplot(sampling_locations) +
+      geom_sf() +
+      ggtitle("Sampling locations") +
+      theme_minimal()
+  })
+  
+  # This controls conditionalPanel visibility
+  output$show_samplingLocations <- reactive({
+    !is.null(input$samples_upload) && samples_valid()
+  })
+  outputOptions(output, "show_samplingLocations", suspendWhenHidden = FALSE)
+  
+  ## Plot sampling area -------------------------
+  uploaded_trainingArea <- reactive({
+    req(input$trainArea_upload)
+    
+    tryCatch({
+      st_read(input$trainArea_upload$datapath)
+    }, error = function(e) {
+      showNotification("Failed to read the training area .gpkg file.", type = "error")
+      NULL    })
+  })
+  
+  output$m_algorithms_5 <- renderPlot({
+    training_area <- uploaded_trainingArea()
+    req(training_area)
+    
+    ggplot(training_area) +
+      geom_sf() +
+      ggtitle("Training/Prediction area") +
+      theme_minimal()
+  })
+  
+  # This controls conditionalPanel visibility
+  output$show_trainArea <- reactive({
+    !is.null(input$trainArea_upload) && trainArea_valid()
+  })
+  outputOptions(output, "show_trainArea", suspendWhenHidden = FALSE)
+  
+  ## Plot prediction area -------------------------
+  uploaded_predictionArea <- reactive({
+    req(input$prediction_upload)
+    
+    tryCatch({
+      st_read(input$prediction_upload$datapath)
+    }, error = function(e) {
+      showNotification("Failed to read the prediction area .gpkg file.", type = "error")
+      NULL    })
+  })
+  
+  output$p_pred <- renderPlot({
+    prediction_area <- uploaded_predictionArea()
+    req(prediction_area)
+    
+    ggplot(prediction_area) +
+      geom_sf() +
+      ggtitle("Training/Prediction area") +
+      theme_minimal()
+  })
+  
+  output$show_predictionArea <- renderText({
+    if (isTruthy(input$prediction_upload) && prediction_valid()) {
+      "true"
+    } else {
+      "false"
+    }
+  })
+  outputOptions(output, "show_predictionArea", suspendWhenHidden = FALSE)
+  
+  
+  ## show geodist plot if both prediction area and samples are uploaded -------------
+  output$geodist <- renderPlot({
+    samples <- uploaded_samplingLocations()
+    prediction_area <- uploaded_predictionArea()
+    req(samples, prediction_area)
+    
+    sf::st_crs(samples) <- sf::st_crs(prediction_area)
+    plot(CAST::geodist(samples, prediction_area)) + 
+      ggplot2::ggtitle("Density distribution of Nearest-Neighbour Distances") +
+      ggplot2::theme(aspect.ratio=0.5)
+  })
+  
+  output$showGeodist <- renderText({
+    if (isTruthy(input$prediction_upload) && prediction_valid() && isTruthy(input$samples_upload) && samples_valid()) {
+      "true"
+    } else {
+      "false"
+    }
+  })
+  outputOptions(output, "showGeodist", suspendWhenHidden = FALSE)
+  
   
 }

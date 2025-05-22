@@ -3,6 +3,7 @@ library(shinyjs)
 library(shinyWidgets)
 library(shinythemes)
 library(shinydashboard)
+library(shinyBS)
 library(DT)
 
 
@@ -97,14 +98,59 @@ ui <-  tagList(
             uiOutput("Overview_UI")
           )),
           
-          tabPanel("2. Model", value = "Model", fluidPage(
-            em(p("Describe your modeling approach in detail.", style = "padding-top: 10px; font-weight: 300")),
-            uiOutput("Model_UI")
-          )),
+          tabPanel("2. Model",
+                   shiny::fluidPage(
+                     
+                     bsCollapse(
+                       bsCollapsePanel("Upload of model", style = "primary",
+                                       fileInput("model_upload", "Upload model object (RDS)", accept = ".rds")),
+                       bsCollapsePanel("Predictor Variables", style = "primary",
+                                       uiOutput("Model_UI_predictor")),
+                       bsCollapsePanel("Response Variables", style = "primary",
+                                       fileInput("samples_upload", "Upload training data (GeoPackage)", accept = ".gpkg"),
+                                       # Optional map output shown only if a file is uploaded
+                                       conditionalPanel(
+                                         condition = "output.show_samplingLocations == true",
+                                         plotOutput("d_response_7", height = "400px")
+                                       ),
+                                       uiOutput("Model_UI_response")),
+                       bsCollapsePanel("Learning method", style = "primary",
+                                       fileInput("trainArea_upload", "Upload training area (GeoPackage)", accept = ".gpkg"),
+                                       # Optional map output shown only if a file is uploaded
+                                       conditionalPanel(
+                                         condition = "output.show_trainArea == true",
+                                         plotOutput("m_algorithms_5", height = "400px")
+                                       ),
+                                       uiOutput("Model_UI_algorithms")),
+                       bsCollapsePanel("Model Validation", style = "primary",
+                                       uiOutput("Model_UI_validation")),
+                       bsCollapsePanel("Model interpretation", style = "primary",
+                                       uiOutput("Model_UI_interpretation")),
+                       bsCollapsePanel("Software", style = "primary",
+                                       uiOutput("Model_UI_Software"))
+                     
+                   
+                   ))),
           
-          tabPanel("3. Prediction", value = "Prediction", fluidPage(
-            em(p("Detail the models predictions.", style = "padding-top: 10px; font-weight: 300")),
-            uiOutput("Prediction_UI")
+          tabPanel("3. Prediction", fluidPage(
+            bsCollapse(
+              bsCollapsePanel("Prediction domain", style = "primary",
+                              fileInput("prediction_upload", "Upload prediction area (.gpkg)", accept = ".gpkg"),
+                              conditionalPanel(
+                                condition = "output.show_predictionArea == 'true'",
+                                plotOutput("p_pred", height = "400px")
+                              ),
+                              conditionalPanel(
+                                condition = "output.showGeodist == 'true'",
+                                plotOutput("geodist", height = "200px")
+                              ),
+                              uiOutput("Prediction_UI_area")),
+              bsCollapsePanel("Evaluation and Uncertainty", style = "primary",
+                              uiOutput("Prediction_UI_eval")),
+              bsCollapsePanel("Post-Processing", style = "primary",
+                              uiOutput("Prediction_UI_post"))
+              
+            )
           ))
         ))
     )),
@@ -123,11 +169,9 @@ ui <-  tagList(
         column(width = 2),
         column(width = 8, 
                p("There are two options for importing data into your ODMAP protocol", style = "font-size: 18px;"),
-               p(tags$b("(1) Upload an ODMAP protocol (.csv)"), br(), "This option is convenient if you want to edit or resume working on a previously saved ODMAP protocol.", style = "font-size: 18px;"),
-               p(tags$b("(2) Upload an RMM file (.RDS or .csv)"), br(), "The rangeModelMetaData package of Merow et al. (2019) allows exporting standardized metadata 
-                         for SDMs directly from R. Note that the objectives of ODMAP and RMM differ and not all fields can be mapped between both approaches. 
-                         This option is therefore not a replacement for filling out ODMAP, but may be helpful for e.g. documenting model settings or references. 
-                         If RMM values have been imported, the corresponding field and entity is indicated in parentheses as Field1($Field2)($Field3)-Entity)", style = "font-size: 18px;"),
+              # Add this section for GPKG upload
+       p(tags$b("(1) Upload an ODMAP protocol (.csv)"), br(), "This option is convenient if you want to edit or resume working on a previously saved ODMAP protocol.", style = "font-size: 18px;"),
+
                p("Choose file", style = "font-size: 18px; font-weight: bold"),
                fileInput("upload", label = NULL, accept = c(".csv")),
                uiOutput("Upload_UI")),
