@@ -289,14 +289,14 @@ server <- function(input, output, session) {
   prediction_valid <- reactiveVal(TRUE)
   
   # check if training area is valid
-  observeEvent(input$prediction_upload, {
-    req(input$prediction_upload)
+  observeEvent(input$trainArea_upload, {
+    req(input$trainArea_upload)
     
     trainArea_valid(TRUE)  # reset
     auto_selected(NULL)
     
     trainArea <- tryCatch({
-      st_read(input$prediction_upload$datapath, quiet = TRUE)
+      st_read(input$trainArea_upload$datapath, quiet = TRUE)
     }, error = function(e) {
       showNotification("Could not read prediction area file.", type = "error")
       return(NULL)
@@ -1126,95 +1126,95 @@ server <- function(input, output, session) {
   
   ## Upload gpkg --------------------
   ## Plot sampling locations -------------------------
-  uploaded_gpkg <- reactive({
+  uploaded_samplingLocations <- reactive({
     req(input$samples_upload)
     
     tryCatch({
       st_read(input$samples_upload$datapath)
     }, error = function(e) {
-      showNotification("Failed to read .gpkg file.", type = "error")
+      showNotification("Failed to read the sampling location .gpkg file.", type = "error")
       NULL
     })
   })
 
   output$d_response_7 <- renderPlot({
-    gpkg_data <- uploaded_gpkg()
-    req(gpkg_data)
+    sampling_locations <- uploaded_samplingLocations()
+    req(sampling_locations)
     
-    ggplot(gpkg_data) +
+    ggplot(sampling_locations) +
       geom_sf() +
       ggtitle("Sampling locations") +
       theme_minimal()
   })
   
   # This controls conditionalPanel visibility
-  output$showGpkgPlot <- reactive({
+  output$show_samplingLocations <- reactive({
     !is.null(input$samples_upload) && samples_valid()
   })
-  outputOptions(output, "showGpkgPlot", suspendWhenHidden = FALSE)
+  outputOptions(output, "show_samplingLocations", suspendWhenHidden = FALSE)
   
   ## Plot sampling area -------------------------
-  uploaded_gpkg_3 <- reactive({
+  uploaded_trainingArea <- reactive({
     req(input$trainArea_upload)
     
     tryCatch({
       st_read(input$trainArea_upload$datapath)
     }, error = function(e) {
-      showNotification("Failed to read second .gpkg file.", type = "error")
+      showNotification("Failed to read the training area .gpkg file.", type = "error")
       NULL    })
   })
   
   output$m_algorithms_5 <- renderPlot({
-    gpkg_data3 <- uploaded_gpkg_3()
-    req(gpkg_data3)
+    training_area <- uploaded_trainingArea()
+    req(training_area)
     
-    ggplot(gpkg_data3) +
+    ggplot(training_area) +
       geom_sf() +
       ggtitle("Training/Prediction area") +
       theme_minimal()
   })
   
   # This controls conditionalPanel visibility
-  output$showGpkgPlot3 <- reactive({
+  output$show_trainArea <- reactive({
     !is.null(input$trainArea_upload) && trainArea_valid()
   })
-  outputOptions(output, "showGpkgPlot3", suspendWhenHidden = FALSE)
+  outputOptions(output, "show_trainArea", suspendWhenHidden = FALSE)
   
   ## Plot prediction area -------------------------
-  uploaded_gpkg_2 <- reactive({
+  uploaded_predictionArea <- reactive({
     req(input$prediction_upload)
     
     tryCatch({
       st_read(input$prediction_upload$datapath)
     }, error = function(e) {
-      showNotification("Failed to read second .gpkg file.", type = "error")
+      showNotification("Failed to read the prediction area .gpkg file.", type = "error")
       NULL    })
   })
   
   output$p_pred <- renderPlot({
-    gpkg_data2 <- uploaded_gpkg_2()
-    req(gpkg_data2)
+    prediction_area <- uploaded_predictionArea()
+    req(prediction_area)
     
-    ggplot(gpkg_data2) +
+    ggplot(prediction_area) +
       geom_sf() +
       ggtitle("Training/Prediction area") +
       theme_minimal()
   })
   
-  output$showGpkgPlot2 <- renderText({
+  output$show_predictionArea <- renderText({
     if (isTruthy(input$prediction_upload) && prediction_valid()) {
       "true"
     } else {
       "false"
     }
   })
-  outputOptions(output, "showGpkgPlot2", suspendWhenHidden = FALSE)
+  outputOptions(output, "show_predictionArea", suspendWhenHidden = FALSE)
   
   
-  # show geodist plot if both prediction area and samples are uploaded
+  ## show geodist plot if both prediction area and samples are uploaded -------------
   output$geodist <- renderPlot({
-    samples <- uploaded_gpkg()
-    prediction_area <- uploaded_gpkg_2()
+    samples <- uploaded_samplingLocations()
+    prediction_area <- uploaded_predictionArea()
     req(samples, prediction_area)
     
     sf::st_crs(samples) <- sf::st_crs(prediction_area)

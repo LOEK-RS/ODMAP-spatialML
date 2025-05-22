@@ -13,7 +13,7 @@
 4,Model,m,Response,m_response,Classes,d_response_4,Number of classes,n_classes,,1,1,1
 5,Model,m,Response,m_response,Samples per class,d_response_5,Samples per class,n_samples_per_class,,1,1,1
 6,Model,m,Response,m_response,Range,d_response_6,Interpolation range,interpolation_range,,1,1,1
-8,Model,m,Response,m_response,Sampling design,d_response_8,Sampling design,sampling_design,,0,1,1
+8,Model,m,Response,m_response,Sampling design,d_response_8,Sampling design (will be automatically filled when sampling locations and prediction area are provided as .gpkg),sampling_design,,0,1,1
 9,Model,m,Response,m_response,Coordinate Reference System,d_response_9,Coordinate Reference System (epsg),samples_crs,,1,1,1
 10,Model,m,Response,m_response,Data sources,d_response_10,Data sources,text,,1,1,1
 11,Model,m,Predictors,m_predictors,Predictor types,d_predictors_1,Type of predictor variables: choose from list or insert new values,suggestion,"Remote Sensing Images, Simulated Data, Spatial Proxies",0,1,1

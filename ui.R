@@ -110,7 +110,7 @@ ui <-  tagList(
                                        fileInput("samples_upload", "Upload training data (GeoPackage)", accept = ".gpkg"),
                                        # Optional map output shown only if a file is uploaded
                                        conditionalPanel(
-                                         condition = "output.showGpkgPlot == true",
+                                         condition = "output.show_samplingLocations == true",
                                          plotOutput("d_response_7", height = "400px")
                                        ),
                                        uiOutput("Model_UI_response")),
@@ -118,7 +118,7 @@ ui <-  tagList(
                                        fileInput("trainArea_upload", "Upload training area (GeoPackage)", accept = ".gpkg"),
                                        # Optional map output shown only if a file is uploaded
                                        conditionalPanel(
-                                         condition = "showGpkgPlot3 == true",
+                                         condition = "output.show_trainArea == true",
                                          plotOutput("m_algorithms_5", height = "400px")
                                        ),
                                        uiOutput("Model_UI_algorithms")),
@@ -137,12 +137,12 @@ ui <-  tagList(
               bsCollapsePanel("Prediction domain", style = "primary",
                               fileInput("prediction_upload", "Upload prediction area (.gpkg)", accept = ".gpkg"),
                               conditionalPanel(
-                                condition = "output.showGeodist == 'true'",
-                                plotOutput("geodist", height = "200px")
+                                condition = "output.show_predictionArea == 'true'",
+                                plotOutput("p_pred", height = "400px")
                               ),
                               conditionalPanel(
-                                condition = "output.showGpkgPlot2 == 'true'",
-                                plotOutput("p_pred", height = "400px")
+                                condition = "output.showGeodist == 'true'",
+                                plotOutput("geodist", height = "200px")
                               ),
                               uiOutput("Prediction_UI_area")),
               bsCollapsePanel("Evaluation and Uncertainty", style = "primary",
