@@ -40,7 +40,7 @@ ui <-  tagList(
                  While there exist such protocols for machine-learning models in general (e.g., Model Cards, REFORMs), as well as for specific domains 
                  like species distribution modelling (ODMAP), to date such protocols are lacking in the general field of spatio-temporal modelling.", 
                  style= "font-size: 18px;"), 
-               img(src = "workflow.jpg", width = "60%", style="display: block; margin-left: auto; margin-right: auto; min-width: 500px;"), br(),
+               img(src = "workflow.png", width = "60%", style="display: block; margin-left: auto; margin-right: auto; min-width: 500px;"), br(),
                p("We propose a protocol for spatio-temporal models to fill this gap: STeMP. This protocol contains three major sections.
                   To facilitate community engagement, the protocol is hosted on Github (). Any missing points or other feedback can be 
                   submitted as a pull request, and the community can vote if it should be included in the protocol.",
